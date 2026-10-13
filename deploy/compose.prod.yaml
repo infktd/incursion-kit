@@ -1,0 +1,77 @@
+# Production stack on one host: MySQL, the waitlist backend and Caddy with automatic HTTPS.
+#
+#   cp deploy/.env.example deploy/.env      # then fill it in (see docs/deploy.md)
+#   docker compose -f deploy/compose.prod.yaml up -d
+#
+# Caddy serves https://$SITE_HOST: `/api/*` goes to the backend, everything else to your frontend
+# (static files from $FRONTEND_DIR, or a separate server at $FRONTEND_UPSTREAM).
+name: incursion-kit
+
+services:
+  mysql:
+    image: mysql:9.7
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in deploy/.env}
+      MYSQL_DATABASE: waitlist
+      MYSQL_USER: waitlist
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in deploy/.env}
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      # The password stays inside the container (no -p on the command line).
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  waitlist:
+    image: ${WAITLIST_IMAGE:?set WAITLIST_IMAGE in deploy/.env}
+    restart: unless-stopped
+    environment:
+      WAITLIST__DATABASE__URL: mysql://waitlist:${MYSQL_PASSWORD}@mysql:3306/waitlist
+      WAITLIST__APP__TOKEN_SECRET: ${TOKEN_SECRET:?set TOKEN_SECRET in deploy/.env}
+      WAITLIST__ESI__CLIENT_ID: ${ESI_CLIENT_ID:?set ESI_CLIENT_ID in deploy/.env}
+      WAITLIST__ESI__CLIENT_SECRET: ${ESI_CLIENT_SECRET:?set ESI_CLIENT_SECRET in deploy/.env}
+      WAITLIST__ESI__URL: https://${SITE_HOST:?set SITE_HOST in deploy/.env}/auth/cb
+      RUST_LOG: ${RUST_LOG:-info}
+    # Optional: more settings in a config file (environment variables win over it).
+    # volumes:
+    #   - ./config.toml:/app/config.toml:ro
+    volumes:
+      # Community data (fits, skills, guides, translations...). Seeded with the example data set
+      # on first start; edit it through the admin API or `docker compose cp`.
+      - waitlist-data:/app/data
+      # EVE static data, built on first start (downloads ~100 MB from CCP).
+      - sde:/app/sde
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.11
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_HOST: ${SITE_HOST}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in deploy/.env}
+      FRONTEND_MODE: ${FRONTEND_MODE:-static}
+      FRONTEND_UPSTREAM: ${FRONTEND_UPSTREAM:-}
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - ${FRONTEND_DIR:-./frontend}:/srv/frontend:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - waitlist
+
+volumes:
+  mysql:
+  waitlist-data:
+  sde:
+  caddy-data:
+  caddy-config:

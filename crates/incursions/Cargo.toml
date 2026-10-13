@@ -1,0 +1,27 @@
+[package]
+name = "wl-incursions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+utoipa.workspace = true
+wl-core.workspace = true
+wl-db.workspace = true
+wl-esi.workspace = true
+wl-eve-data.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+reqwest.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

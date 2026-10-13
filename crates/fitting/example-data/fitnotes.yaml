@@ -1,0 +1,47 @@
+# Notes shown next to doctrine fits (Markdown). Use the exact fit name for a fit, or the tier name
+# as it appears in the page URL for a tier.
+
+notes:
+  # Tier message
+
+  - name: Shield
+    description: >
+      
+  - name: Armor 
+    description: >
+     
+      
+
+  # Ship specific notes
+
+  - name: SHIELD_KRONOS
+    description: >
+      DPS **MAIN:** 4100 **ALT:** 3813
+  - name: SHIELD_PALADIN
+    description: >
+      DPS **MAIN:** 3350 **ALT:** 3115
+  - name: SHIELD_VARGUR
+    description: >
+      DPS **MAIN:** 3350 **ALT:** 3115
+      Offline tractor beam when not in use
+  - name: ARMOR_KRONOS
+    description: >
+      DPS **MAIN:** 4100 **ALT:** 3813
+  - name: ARMOR_PALADIN
+    description: >
+      DPS **MAIN:** 3350 **ALT:** 3115
+  - name: SHIELD_VINDI
+    description: >
+      Few allowed in fleet
+  - name: ARMOR_VINDI
+    description: >
+      DPS 2150 Web 94.5% 15.5km Badge **NOT** required to fly
+  - name: ARMOR_NESTOR
+    description: >
+      Needs to be cap stable with 5 reps running & MWD on
+  - name: ARMOR_LOKI_MWD
+    description: >
+      Needs to be cap stable with 8 reps running only
+  - name: ARMOR_LOKI
+    description: >
+      Needs to be cap stable with 8 reps running & AB on

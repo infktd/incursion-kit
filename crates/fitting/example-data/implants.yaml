@@ -1,0 +1,91 @@
+# Implant guide shown on the Fits page.
+# Each set becomes a clickable badge that opens a table of recommended implants.
+#
+# Slot entries under default / alternative:
+#   name:  (required) implant type name — clickable to copy
+#   note:  (optional) bonus text shown after the name
+#   group: (optional) bold label above the implant (e.g. hull name)
+
+sets:
+  - name: Implants
+    slots:
+      - slot: 1
+        default:
+          - name: High-grade Ascendancy Alpha
+        alternative: []
+      - slot: 2
+        default:
+          - name: High-grade Ascendancy Beta
+        alternative: []
+      - slot: 3
+        default:
+          - name: High-grade Ascendancy Gamma
+        alternative: []
+      - slot: 4
+        default:
+          - name: High-grade Ascendancy Delta
+        alternative: []
+      - slot: 5
+        default:
+          - name: High-grade Ascendancy Epsilon
+        alternative: []
+      - slot: 6
+        default:
+          - name: WS-618
+            note: +18% warp speed
+        alternative:
+          - name: High-grade Ascendancy Omega
+            note: +21% warp speed
+      - slot: 7
+        default:
+          - group: Kronos/Paladin/Vindicator
+            name: Ogdin's Eye
+            note: +6% Tracking
+          - group: Vargur
+            name: TA-706
+            note: +6% Falloff
+        alternative:
+          - name: MR-706
+            note: +6% Tracking
+          - group: Logi
+            name: RA-706
+            note: -6% Cap use for remote reps
+      - slot: 8
+        default:
+          - name: EM-806
+            note: +6% Capacitor
+        alternative:
+          - name: Zor's Custom Navigation Hyper-Link
+            note: +5% MWD/AB Speed
+          - group: Vindicator
+            name: MR-807
+            note: +7% Web range
+      - slot: 9
+        default:
+          - name: RF-906
+            note: +6% rate of fire for all turrets
+        alternative:
+          - name: SS-906
+            note: +6% damage for all turrets
+          - name: Pashan's Turret Customization Mindlink
+            note: +7% rate of fire for all turrets
+      - slot: 10
+        default:
+          - group: Kronos/Vindicator
+            name: LH-1006
+            note: +6% hybrid weapon damage
+          - group: Paladin
+            name: LE-1006
+            note: +6% energy weapon damage
+          - group: Vargur
+            name: LP-1006
+            note: +6% projectile weapon damage
+        alternative:
+          - group: Paladin
+            name: Pashan's Turret Handling Mindlink
+            note: +7% energy weapon damage
+          - group: Logi
+            name: HG-1006
+            note: +6% Armor hitpoints
+          - name: HG-1008
+            note: +8% Armor hitpoints

@@ -1,0 +1,132 @@
+# Community rules for the fit checker, x-up and skill plans.
+#
+# Copy this file to the data directory as `rules.yaml` to change it. When the data directory has
+# no `rules.yaml`, the waitlist uses this built-in copy, whose values reproduce the legacy
+# waitlist exactly. Type names must match the static data exactly (case-sensitive).
+
+fit_check:
+  # Category of fits that match no rule in categories.yaml.
+  default_category: other
+
+  # Tags granted by role permissions. The first entry whose access key the account holds adds its
+  # tag, and then no badge tags are added.
+  access_tags:
+    - access: "waitlist-tag:HQ-FC"
+      tag: HQ-FC
+    - access: "waitlist-tag:TRAINEE"
+      tag: TRAINEE
+
+  # Badges copied onto the fit as tags (when no access tag applied).
+  badge_tags: [LOGI, ALT, DPS, VINDI]
+
+  # A pilot holding the badge is approved on this hull without any doctrine check.
+  badge_auto_approve:
+    - hull: Vindicator
+      badge: VINDI
+
+  # Implant sets referenced below. A pilot "has" a set when every implant of it is plugged in.
+  implant_sets:
+    HYBRID:
+      - High-grade Amulet Alpha
+      - High-grade Amulet Beta
+      - High-grade Amulet Delta
+      - High-grade Amulet Epsilon
+      - High-grade Amulet Gamma
+
+  # Fitting `module` while having (has_set: true) or lacking (has_set: false) an implant set adds
+  # the tag and blocks auto-approval, except on the exempt hulls.
+  implant_module_rules:
+    - implant_set: HYBRID
+      has_set: true
+      module: Large Trimark Armor Pump II
+      tag: HYBRID-TRIMARK
+      exempt_hulls: [Nestor, Vindicator]
+    - implant_set: HYBRID
+      has_set: false
+      module: Large Hyperspatial Velocity Optimizer II
+      tag: NON-HYBRID-HYPERSPATIAL
+      exempt_hulls: [Nestor, Vindicator]
+
+  # More than `max_hours` in fleet on this hull adds the tag and blocks auto-approval, unless the
+  # fit already carries `unless_tag`.
+  time_in_fleet_limits:
+    - hull: Vindicator
+      max_hours: 20
+      unless_tag: DPS
+      tag: DPS-HOURS-REACHED
+
+fittings:
+  # Doctrine fits whose name contains this are not listed on the public fittings page.
+  hidden_fit_marker: ALTERNATIVE
+  # Items of the category rules for this category are sent as `rules` with the fittings.
+  rules_category: logi
+
+war:
+  # Pilots whose corporation or alliance is at war cannot x-up fits in these categories.
+  blocked_categories: [logi]
+  # Tag added to fits of pilots at war (their fits are never auto-approved).
+  tag: AT-WAR
+
+skill_plans:
+  # Skill set (a `requirements` key in skills.yaml) whose priorities order tank and single-skill
+  # plan steps.
+  generic_skill_set: Megathron
+
+  # Skill sets named "<prefix> <hull>" are tank variants of that hull, e.g. "Armor Kronos".
+  variant_prefixes: [Armor, Shield]
+
+  # Hulls whose skills depend on the doctrine fit: the first `fit_name_contains` match picks the
+  # skill set; `default` applies to fit plans when nothing matches.
+  hull_variants:
+    - hull: Kronos
+      default: Armor Kronos
+      by_fit_name:
+        - fit_name_contains: ARMOR
+          skill_set: Armor Kronos
+        - fit_name_contains: SHIELD
+          skill_set: Shield Kronos
+
+  # Levels accepted by `type: tank` plan steps, in the order error messages list them. A level
+  # not listed here uses `default_tank_level`.
+  tank_levels:
+    - name: starter
+      skills:
+        EM Armor Compensation: 2
+        Thermal Armor Compensation: 2
+        Kinetic Armor Compensation: 2
+        Explosive Armor Compensation: 2
+    - name: min
+      skills: &armor_compensation_4
+        EM Armor Compensation: 4
+        Thermal Armor Compensation: 4
+        Kinetic Armor Compensation: 4
+        Explosive Armor Compensation: 4
+    - name: elite
+      skills: *armor_compensation_4
+    - name: gold
+      skills: *armor_compensation_4
+    - name: bastion
+      skills:
+        <<: *armor_compensation_4
+        Mechanics: 4
+        Hull Upgrades: 5
+  default_tank_level: min
+
+fleet:
+  # Fleet roles assigned in the fleet MOTD as `<NAME>: <pilot links>` (the fleet composition view
+  # and "assign role" both use them). Names are matched case-insensitively and reported as written
+  # here; `hulls` are the ships each role should fly (a pilot on another hull is flagged).
+  motd_roles:
+    - name: DDD
+      hulls: [Vindicator]
+    - name: LR
+      hulls: [Kronos]
+    - name: PS
+      hulls: [Paladin, Vargur]
+    - name: MS
+      hulls: [Damnation, Eos, Claymore]
+    - name: MTAC
+      hulls: [Paladin, Vargur, Occator, Mastodon, Bustard, Impel]
+  # Link type of pilots added to the MOTD when the role has no link to copy it from
+  # (`showinfo:1377//<id>`, 1377 = Character).
+  motd_link_type: 1377

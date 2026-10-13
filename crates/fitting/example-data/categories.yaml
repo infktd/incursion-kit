@@ -1,0 +1,48 @@
+# Waitlist categories (any number) and the rules that assign ships to them. A fit takes the
+# category of the first rule whose item (hull or module) it contains; fits matching no rule get
+# `fit_check.default_category` from rules.yaml.
+
+categories:
+  - id: logi
+    name: Logistics
+  - id: bastion
+    name: Bastion
+  - id: other
+    name: Other  
+
+rules:
+  # Logi
+
+  - item: Nestor
+    category: logi
+  - item: Loki
+    category: logi
+
+  # Bastion
+  - item: Bastion Module I
+    category: bastion
+  # Ships
+  - item: Vindicator
+    category: other
+  - item: Oneiros
+    category: other
+  - item: Guardian
+    category: other
+  - item: Scimitar
+    category: other
+  - item: Basilisk
+  # Boosters
+    category: other
+  - item: Eos
+    category: other
+  - item: Claymore
+    category: other
+  - item: Damnation
+    category: other
+  - item: Vulture
+    category: other
+  # Sponges
+  - item: Machariel
+    category: other
+  - item: Nightmare
+    category: other

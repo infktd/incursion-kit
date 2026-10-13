@@ -1,0 +1,155 @@
+---
+plans:
+  - name: Minimum T2 Gun Vindicator
+    description: "T2 Guns\n"
+    plan:
+      - type: skills
+        from: Vindicator
+        tier: min
+      - type: fit
+        hull: Vindicator
+        fit: ARMOR_VINDI
+  - name: Good Vindicator
+    description: "FCs will be happy\n"
+    plan:
+      - type: fit
+        hull: Vindicator
+        fit: ARMOR_VINDI
+      - type: skills
+        from: Vindicator
+        tier: elite
+  - name: Recommended Armor Kronos
+    description: "FCs will be happy\n"
+    plan:
+      - type: fit
+        hull: Kronos
+        fit: ARMOR_KRONOS
+      - type: skills
+        from: Armor Kronos
+        tier: elite
+  - name: Recommended Shield Kronos
+    description: "FCs will be happy\n"
+    plan:
+      - type: fit
+        hull: Kronos
+        fit: SHIELD_KRONOS
+      - type: skills
+        from: Shield Kronos
+        tier: elite
+  - name: Armor Kronos T Badge Spec 4 Minimum
+    description: "T badge damage, no extras like speed, tank, tracking etc.\n"
+    plan:
+      - type: fit
+        hull: Kronos
+        fit: ARMOR_KRONOS
+      - type: skill
+        from: Surgical Strike
+        level: 5
+      - type: skill
+        from: Rapid Firing
+        level: 5
+      - type: skill
+        from: Large Blaster Specialization
+        level: 4
+  - name: Shield Kronos T Badge Spec 4 Minimum
+    description: "T badge damage, no extras like speed, tank, tracking etc.\n"
+    plan:
+      - type: fit
+        hull: Kronos
+        fit: SHIELD_KRONOS
+      - type: skill
+        from: Surgical Strike
+        level: 5
+      - type: skill
+        from: Rapid Firing
+        level: 5
+      - type: skill
+        from: Large Blaster Specialization
+        level: 4
+  - name: Recommended Paladin
+    description: "FCs will be happy\n"
+    plan:
+      - type: fit
+        hull: Paladin
+        fit: ARMOR_PALADIN
+      - type: skills
+        from: Paladin
+        tier: elite
+  - name: Paladin T Badge Spec 4 Minimum
+    description: "T badge damage, no extras like speed, tank, tracking etc.\n"
+    plan:
+      - type: fit
+        hull: Paladin
+        fit: ARMOR_PALADIN
+      - type: skill
+        from: Surgical Strike
+        level: 5
+      - type: skill
+        from: Rapid Firing
+        level: 5
+      - type: skill
+        from: Marauders
+        level: 5
+      - type: skill
+        from: Large Pulse Laser Specialization
+        level: 4
+  - name: Recommended Vargur
+    description: "FCs will be happy\n"
+    plan:
+      - type: fit
+        hull: Vargur
+        fit: SHIELD_VARGUR
+      - type: skills
+        from: Vargur
+        tier: elite
+  - name: Vargur T Badge Spec 4 Minimum
+    description: "T Badge damage, no extras like speed, tank, tracking etc.\n"
+    plan:
+      - type: fit
+        hull: Vargur
+        fit: SHIELD_VARGUR
+      - type: skill
+        from: Surgical Strike
+        level: 5
+      - type: skill
+        from: Rapid Firing
+        level: 5
+      - type: skill
+        from: Large Autocannon Specialization
+        level: 4
+  - name: Nestor
+    description: "Nestor\n"
+    plan:
+      - type: fit
+        hull: Nestor
+        fit: ARMOR_NESTOR
+      - type: skills
+        from: Nestor
+        tier: elite
+  - name: Loki
+    description: "Loki\n"
+    plan:
+      - type: fit
+        hull: Loki
+        fit: ARMOR_LOKI_MWD
+      - type: skills
+        from: Loki
+        tier: elite
+  - name: Eos
+    description: "Eos\n"
+    plan:
+      - type: skills
+        from: Eos
+        tier: min
+  - name: Damnation
+    description: "Damnation\n"
+    plan:
+      - type: skills
+        from: Damnation
+        tier: min
+  - name: Claymore
+    description: "Claymore\n"
+    plan:
+      - type: skills
+        from: Claymore
+        tier: min

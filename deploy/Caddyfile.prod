@@ -1,0 +1,40 @@
+# Production site for deploy/compose.prod.yaml. Caddy obtains and renews the HTTPS certificate for
+# $SITE_HOST automatically (ports 80 and 443 must reach this host).
+#
+#   /api/*      → the waitlist backend (including the server-sent event streams)
+#   everything  → the frontend: FRONTEND_MODE=static serves the files mounted at /srv/frontend
+#   else          (single-page apps fall back to /index.html); FRONTEND_MODE=upstream proxies
+#                 to FRONTEND_UPSTREAM (e.g. `frontend:3000`, a server-rendered frontend).
+{
+	email {$ACME_EMAIL}
+}
+
+(frontend_static) {
+	root * /srv/frontend
+	try_files {path} {path}/ {path}.html /index.html
+	file_server
+}
+
+(frontend_upstream) {
+	reverse_proxy {$FRONTEND_UPSTREAM}
+}
+
+{$SITE_HOST} {
+	encode zstd gzip
+
+	handle /api/* {
+		# Server-sent events are flushed immediately; nothing else needs tuning.
+		reverse_proxy waitlist:5000
+	}
+
+	handle {
+		import frontend_{$FRONTEND_MODE}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

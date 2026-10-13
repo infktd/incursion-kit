@@ -1,0 +1,96 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+repository = "https://github.com/infktd/incursion-kit"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[workspace.dependencies]
+# internal
+wl-core = { path = "crates/core" }
+wl-eve-data = { path = "crates/eve-data" }
+wl-fitting = { path = "crates/fitting" }
+wl-esi = { path = "crates/esi" }
+wl-db = { path = "crates/db" }
+wl-live = { path = "crates/live" }
+wl-content = { path = "crates/content" }
+wl-srp = { path = "crates/srp" }
+wl-incursions = { path = "crates/incursions" }
+wl-workers = { path = "crates/workers" }
+wl-api = { path = "crates/api" }
+
+# runtime
+tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "time", "sync", "signal"] }
+futures = "0.3.34"
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+tokio-util = "0.7.20"
+async-stream = "0.3.6"
+
+# http
+axum = { version = "0.8.9", features = ["macros"] }
+axum-extra = { version = "0.12.6", features = ["cookie", "typed-header", "query"] }
+tower = "0.5.3"
+tower-http = { version = "0.7.1", features = ["trace", "request-id", "util"] }
+http = "1.5.0"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "form", "query"] }
+url = "2.5.8"
+eve-esi-client = "0.6.0"
+utoipa = { version = "6.0.0", features = ["chrono", "preserve_order"] }
+utoipa-axum = "0.3.0"
+utoipa-scalar = { version = "0.4.0", features = ["axum"] }
+
+# data
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.152"
+serde-saphyr = "1.3.0"
+arc-swap = "1.9.2"
+zip = { version = "9.0.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+toml = "1.1.8"
+rmp-serde = "1.3.1"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls", "mysql", "sqlite", "macros", "migrate", "chrono", "json", "bigdecimal"] }
+chrono = { version = "0.4.45", features = ["serde"] }
+
+# crypto / encoding
+branca = "0.10.2"
+hex = "0.4.3"
+base64 = "0.23.1"
+rand = "0.10.3"
+
+# util
+config = { version = "0.15.27", default-features = false, features = ["toml"] }
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+regex = "1.13.1"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+
+# test
+wiremock = "0.6.5"
+tempfile = "3.27.0"
+insta = { version = "1.49.0", features = ["json", "yaml"] }
+pretty_assertions = "1.4.1"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = "debuginfo"
+

@@ -1,0 +1,28 @@
+[package]
+name = "wl-fitting"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+utoipa.workspace = true
+wl-core.workspace = true
+wl-eve-data.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr.workspace = true
+thiserror.workspace = true
+regex.workspace = true
+tracing.workspace = true
+arc-swap.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+pretty_assertions.workspace = true
+tempfile.workspace = true
+tokio.workspace = true

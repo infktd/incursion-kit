@@ -1,0 +1,56 @@
+[package]
+name = "wl-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+wl-core.workspace = true
+wl-db.workspace = true
+wl-live.workspace = true
+wl-content.workspace = true
+wl-esi.workspace = true
+wl-eve-data.workspace = true
+wl-fitting.workspace = true
+wl-srp.workspace = true
+wl-workers.workspace = true
+wl-incursions.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+branca.workspace = true
+rmp-serde.workspace = true
+hex.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+futures.workspace = true
+tokio-stream.workspace = true
+async-stream.workspace = true
+image.workspace = true
+regex.workspace = true
+url.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+utoipa-scalar.workspace = true
+
+[dev-dependencies]
+wl-db = { workspace = true, features = ["test-support"] }
+tower = { workspace = true, features = ["util"] }
+tokio.workspace = true
+wiremock.workspace = true
+pretty_assertions.workspace = true
+tempfile.workspace = true

@@ -1,0 +1,34 @@
+[package]
+name = "wl-workers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+wl-core.workspace = true
+wl-db.workspace = true
+wl-esi.workspace = true
+wl-live.workspace = true
+wl-eve-data.workspace = true
+wl-srp.workspace = true
+wl-incursions.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+wl-db = { workspace = true, features = ["test-support"] }
+tokio = { workspace = true, features = ["test-util"] }
+wiremock.workspace = true
+futures.workspace = true

@@ -1,0 +1,266 @@
+---
+source: crates/fitting/tests/data_set.rs
+expression: data.fittings
+---
+{
+  "fittingdata": [
+    {
+      "name": "ARMOR_VINDI",
+      "dna": "17740:2048;1:3186;8:15895;4:15965;1:17559;4:19335;1:26068;1:26402;1:26404;1:31900;1:4383_;1:12787;5000:12791;15000:22993;10000:31900_;2::"
+    },
+    {
+      "name": "ARMOR_PALADIN",
+      "dna": "28659:3057;4:4383;1:15792;2:15810;4:18883;2:19359;1:24348;1:26302;1:26380;1:26914;1:31900;1:31946;1:33400;1:2048_;1:12816;40:12820;40:23119;20:28999;2:29001;2:31900_;1::"
+    },
+    {
+      "name": "SHIELD_KRONOS",
+      "dna": "28661:3186;4:3888;1:4347;2:4383;1:15895;4:15965;1:19208;1:19359;1:22949;1:26394;1:26436;1:31946;1:33400;1:41202;1:11269_;1:12787;20000:12791;20000:31900_;2::"
+    },
+    {
+      "name": "ARMOR_KRONOS",
+      "dna": "28661:3186;4:4383;1:14236;1:15792;2:15895;4:18883;2:19359;1:26302;1:26394;1:26914;1:31900;1:31946;1:33400;1:2048_;1:12787;20000:12791;20000:17559_;1:28999;2:29001;2:29011;1:31900_;1:41155;1::"
+    },
+    {
+      "name": "SHIELD_VARGUR",
+      "dna": "28665:2929;4:4347;2:4383;1:15792;1:15806;4:15965;1:19208;1:19359;1:22949;1:24348;1:26038;1:26430;1:33400;1:41202;1:12775;20000:12779;20000:20353_;1:28999;1:29001;1:31932_;2::"
+    },
+    {
+      "name": "SHIELD_LOKI",
+      "dna": "29990:2048;1:4349;2:14142;1:14144;2:18666;1:19151;8:28744;1:31378;2:31796;1:41218;1:45595;1:45609;1:45621;1:45631;1::"
+    },
+    {
+      "name": "ARMOR_LOKI",
+      "dna": "29990:2048;1:17526;3:18666;1:18710;2:19151;8:31017;1:31059;1:31378;1:31916;1:41218;1:45595;1:45609;1:45621;1:45632;1::"
+    },
+    {
+      "name": "ARMOR_LOKI_MWD",
+      "dna": "29990:2048;1:14146;2:17526;1:18710;2:19151;8:19315;1:28786;1:31017;1:31059;1:31378;1:41218;1:45595;1:45609;1:45620;1:45632;1:28668;500::"
+    },
+    {
+      "name": "ARMOR_NESTOR",
+      "dna": "33472:17526;2:17528;2:18883;2:19335;1:23416;7:26298;2:26322;1:28197;5:28199;5:28288;5:31900;1:33708;5:41191;1:41201;1:41218;2:28668;500:29011;1:31900_;1:41155;1::"
+    }
+  ],
+  "notes": [
+    {
+      "name": "Shield",
+      "description": ""
+    },
+    {
+      "name": "Armor",
+      "description": ""
+    },
+    {
+      "name": "SHIELD_KRONOS",
+      "description": "DPS **MAIN:** 4100 **ALT:** 3813\n"
+    },
+    {
+      "name": "SHIELD_PALADIN",
+      "description": "DPS **MAIN:** 3350 **ALT:** 3115\n"
+    },
+    {
+      "name": "SHIELD_VARGUR",
+      "description": "DPS **MAIN:** 3350 **ALT:** 3115 Offline tractor beam when not in use\n"
+    },
+    {
+      "name": "ARMOR_KRONOS",
+      "description": "DPS **MAIN:** 4100 **ALT:** 3813\n"
+    },
+    {
+      "name": "ARMOR_PALADIN",
+      "description": "DPS **MAIN:** 3350 **ALT:** 3115\n"
+    },
+    {
+      "name": "SHIELD_VINDI",
+      "description": "Few allowed in fleet\n"
+    },
+    {
+      "name": "ARMOR_VINDI",
+      "description": "DPS 2150 Web 94.5% 15.5km Badge **NOT** required to fly\n"
+    },
+    {
+      "name": "ARMOR_NESTOR",
+      "description": "Needs to be cap stable with 5 reps running & MWD on\n"
+    },
+    {
+      "name": "ARMOR_LOKI_MWD",
+      "description": "Needs to be cap stable with 8 reps running only\n"
+    },
+    {
+      "name": "ARMOR_LOKI",
+      "description": "Needs to be cap stable with 8 reps running & AB on\n"
+    }
+  ],
+  "implants": [
+    {
+      "name": "Implants",
+      "slots": [
+        {
+          "slot": 1,
+          "default": [
+            {
+              "name": "High-grade Ascendancy Alpha"
+            }
+          ],
+          "alternative": []
+        },
+        {
+          "slot": 2,
+          "default": [
+            {
+              "name": "High-grade Ascendancy Beta"
+            }
+          ],
+          "alternative": []
+        },
+        {
+          "slot": 3,
+          "default": [
+            {
+              "name": "High-grade Ascendancy Gamma"
+            }
+          ],
+          "alternative": []
+        },
+        {
+          "slot": 4,
+          "default": [
+            {
+              "name": "High-grade Ascendancy Delta"
+            }
+          ],
+          "alternative": []
+        },
+        {
+          "slot": 5,
+          "default": [
+            {
+              "name": "High-grade Ascendancy Epsilon"
+            }
+          ],
+          "alternative": []
+        },
+        {
+          "slot": 6,
+          "default": [
+            {
+              "name": "WS-618",
+              "note": "+18% warp speed"
+            }
+          ],
+          "alternative": [
+            {
+              "name": "High-grade Ascendancy Omega",
+              "note": "+21% warp speed"
+            }
+          ]
+        },
+        {
+          "slot": 7,
+          "default": [
+            {
+              "name": "Ogdin's Eye",
+              "note": "+6% Tracking",
+              "group": "Kronos/Paladin/Vindicator"
+            },
+            {
+              "name": "TA-706",
+              "note": "+6% Falloff",
+              "group": "Vargur"
+            }
+          ],
+          "alternative": [
+            {
+              "name": "MR-706",
+              "note": "+6% Tracking"
+            },
+            {
+              "name": "RA-706",
+              "note": "-6% Cap use for remote reps",
+              "group": "Logi"
+            }
+          ]
+        },
+        {
+          "slot": 8,
+          "default": [
+            {
+              "name": "EM-806",
+              "note": "+6% Capacitor"
+            }
+          ],
+          "alternative": [
+            {
+              "name": "Zor's Custom Navigation Hyper-Link",
+              "note": "+5% MWD/AB Speed"
+            },
+            {
+              "name": "MR-807",
+              "note": "+7% Web range",
+              "group": "Vindicator"
+            }
+          ]
+        },
+        {
+          "slot": 9,
+          "default": [
+            {
+              "name": "RF-906",
+              "note": "+6% rate of fire for all turrets"
+            }
+          ],
+          "alternative": [
+            {
+              "name": "SS-906",
+              "note": "+6% damage for all turrets"
+            },
+            {
+              "name": "Pashan's Turret Customization Mindlink",
+              "note": "+7% rate of fire for all turrets"
+            }
+          ]
+        },
+        {
+          "slot": 10,
+          "default": [
+            {
+              "name": "LH-1006",
+              "note": "+6% hybrid weapon damage",
+              "group": "Kronos/Vindicator"
+            },
+            {
+              "name": "LE-1006",
+              "note": "+6% energy weapon damage",
+              "group": "Paladin"
+            },
+            {
+              "name": "LP-1006",
+              "note": "+6% projectile weapon damage",
+              "group": "Vargur"
+            }
+          ],
+          "alternative": [
+            {
+              "name": "Pashan's Turret Handling Mindlink",
+              "note": "+7% energy weapon damage",
+              "group": "Paladin"
+            },
+            {
+              "name": "HG-1006",
+              "note": "+6% Armor hitpoints",
+              "group": "Logi"
+            },
+            {
+              "name": "HG-1008",
+              "note": "+8% Armor hitpoints"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "rules": [
+    33472,
+    29990
+  ]
+}

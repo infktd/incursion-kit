@@ -1,0 +1,522 @@
+---
+source: crates/fitting/tests/fit_check.rs
+expression: snapshot
+---
+{
+  "ALTERNATIVE2_VINDI as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ALTERNATIVE2_VINDI"
+    },
+    "approved": true,
+    "category": "other"
+  },
+  "ALTERNATIVE2_VINDI sloppy": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {
+        "3186": {
+          "7783": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "31900": 1
+      },
+      "name": "ALTERNATIVE2_VINDI"
+    },
+    "approved": false,
+    "category": "other"
+  },
+  "ALTERNATIVE3_VINDI as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ALTERNATIVE3_VINDI"
+    },
+    "approved": true,
+    "category": "other"
+  },
+  "ALTERNATIVE3_VINDI sloppy": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {
+        "3186": {
+          "7783": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "26404": 1
+      },
+      "name": "ALTERNATIVE3_VINDI"
+    },
+    "approved": false,
+    "category": "other"
+  },
+  "ALTERNATIVE4_VINDI as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ALTERNATIVE4_VINDI"
+    },
+    "approved": true,
+    "category": "other"
+  },
+  "ALTERNATIVE4_VINDI sloppy": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {
+        "2048": {
+          "5839": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "31900": 1
+      },
+      "name": "ALTERNATIVE4_VINDI"
+    },
+    "approved": false,
+    "category": "other"
+  },
+  "ALTERNATIVE_NESTOR as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ALTERNATIVE_NESTOR",
+      "srp_modified": [
+        {
+          "market_percent": 100.0,
+          "type_id": 28197
+        },
+        {
+          "market_percent": 100.0,
+          "type_id": 28199
+        },
+        {
+          "flat": 5000000,
+          "type_id": 28288
+        },
+        {
+          "market_percent": 100.0,
+          "type_id": 33708
+        }
+      ]
+    },
+    "approved": true,
+    "category": "logi"
+  },
+  "ALTERNATIVE_NESTOR sloppy": {
+    "analysis": {
+      "cargo_missing": {
+        "29011": 1
+      },
+      "downgraded": {
+        "17526": {
+          "421": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "41218": 2
+      },
+      "name": "ALTERNATIVE_NESTOR",
+      "srp_modified": [
+        {
+          "market_percent": 100.0,
+          "type_id": 28197
+        },
+        {
+          "market_percent": 100.0,
+          "type_id": 28199
+        },
+        {
+          "flat": 5000000,
+          "type_id": 28288
+        },
+        {
+          "market_percent": 100.0,
+          "type_id": 33708
+        }
+      ]
+    },
+    "approved": false,
+    "category": "logi"
+  },
+  "ALTERNATIVE_VINDI as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ALTERNATIVE_VINDI"
+    },
+    "approved": true,
+    "category": "other"
+  },
+  "ALTERNATIVE_VINDI sloppy": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {
+        "3186": {
+          "7783": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "41201": 1
+      },
+      "name": "ALTERNATIVE_VINDI"
+    },
+    "approved": false,
+    "category": "other"
+  },
+  "ARMOR_KRONOS as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ARMOR_KRONOS"
+    },
+    "approved": true,
+    "category": "bastion"
+  },
+  "ARMOR_KRONOS sloppy": {
+    "analysis": {
+      "cargo_missing": {
+        "17559": 1,
+        "2048": 1,
+        "28999": 1,
+        "29001": 1,
+        "29011": 1
+      },
+      "downgraded": {
+        "3186": {
+          "7783": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "33400": 1
+      },
+      "name": "ARMOR_KRONOS"
+    },
+    "approved": false,
+    "category": "other"
+  },
+  "ARMOR_LOKI as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ARMOR_LOKI"
+    },
+    "approved": true,
+    "category": "logi"
+  },
+  "ARMOR_LOKI sloppy": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {
+        "2048": {
+          "5839": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "45632": 1
+      },
+      "name": "ARMOR_LOKI"
+    },
+    "approved": false,
+    "category": "logi"
+  },
+  "ARMOR_LOKI_MWD as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ARMOR_LOKI_MWD"
+    },
+    "approved": true,
+    "category": "logi"
+  },
+  "ARMOR_LOKI_MWD sloppy": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {
+        "2048": {
+          "5839": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "45632": 1
+      },
+      "name": "ARMOR_LOKI_MWD"
+    },
+    "approved": false,
+    "category": "logi"
+  },
+  "ARMOR_NESTOR as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ARMOR_NESTOR",
+      "srp_modified": [
+        {
+          "market_percent": 100.0,
+          "type_id": 28197
+        },
+        {
+          "market_percent": 100.0,
+          "type_id": 28199
+        },
+        {
+          "flat": 5000000,
+          "type_id": 28288
+        },
+        {
+          "market_percent": 100.0,
+          "type_id": 33708
+        }
+      ]
+    },
+    "approved": true,
+    "category": "logi"
+  },
+  "ARMOR_NESTOR sloppy": {
+    "analysis": {
+      "cargo_missing": {
+        "29011": 1
+      },
+      "downgraded": {
+        "17526": {
+          "421": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "41218": 2
+      },
+      "name": "ARMOR_NESTOR",
+      "srp_modified": [
+        {
+          "market_percent": 100.0,
+          "type_id": 28197
+        },
+        {
+          "market_percent": 100.0,
+          "type_id": 28199
+        },
+        {
+          "flat": 5000000,
+          "type_id": 28288
+        },
+        {
+          "market_percent": 100.0,
+          "type_id": 33708
+        }
+      ]
+    },
+    "approved": false,
+    "category": "logi"
+  },
+  "ARMOR_PALADIN as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ARMOR_PALADIN"
+    },
+    "approved": true,
+    "category": "bastion"
+  },
+  "ARMOR_PALADIN sloppy": {
+    "analysis": {
+      "cargo_missing": {
+        "2048": 1,
+        "28999": 1,
+        "29001": 1
+      },
+      "downgraded": {
+        "3057": {
+          "7171": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "33400": 1
+      },
+      "name": "ARMOR_PALADIN"
+    },
+    "approved": false,
+    "category": "other"
+  },
+  "ARMOR_PALADIN_ALTERNATIVE as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ARMOR_PALADIN_ALTERNATIVE"
+    },
+    "approved": true,
+    "category": "bastion"
+  },
+  "ARMOR_PALADIN_ALTERNATIVE sloppy": {
+    "analysis": {
+      "cargo_missing": {
+        "2048": 1,
+        "28999": 1,
+        "29001": 1
+      },
+      "downgraded": {
+        "3057": {
+          "7171": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "15792": 1
+      },
+      "name": "ARMOR_PALADIN"
+    },
+    "approved": false,
+    "category": "bastion"
+  },
+  "ARMOR_VINDI as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "ARMOR_VINDI"
+    },
+    "approved": true,
+    "category": "other"
+  },
+  "ARMOR_VINDI sloppy": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {
+        "2048": {
+          "5839": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "31900": 1
+      },
+      "name": "ARMOR_VINDI"
+    },
+    "approved": false,
+    "category": "other"
+  },
+  "SHIELD_KRONOS as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "SHIELD_KRONOS"
+    },
+    "approved": true,
+    "category": "bastion"
+  },
+  "SHIELD_KRONOS sloppy": {
+    "analysis": {
+      "cargo_missing": {
+        "11269": 1
+      },
+      "downgraded": {
+        "3186": {
+          "7783": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "41202": 1
+      },
+      "name": "SHIELD_KRONOS"
+    },
+    "approved": false,
+    "category": "bastion"
+  },
+  "SHIELD_LOKI as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "SHIELD_LOKI"
+    },
+    "approved": true,
+    "category": "logi"
+  },
+  "SHIELD_LOKI sloppy": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {
+        "2048": {
+          "5839": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "45631": 1
+      },
+      "name": "SHIELD_LOKI"
+    },
+    "approved": false,
+    "category": "logi"
+  },
+  "SHIELD_VARGUR as flown": {
+    "analysis": {
+      "cargo_missing": {},
+      "downgraded": {},
+      "extra": {},
+      "missing": {},
+      "name": "SHIELD_VARGUR"
+    },
+    "approved": true,
+    "category": "bastion"
+  },
+  "SHIELD_VARGUR sloppy": {
+    "analysis": {
+      "cargo_missing": {
+        "20353": 1,
+        "28999": 1,
+        "29001": 1
+      },
+      "downgraded": {
+        "2929": {
+          "9327": 1
+        }
+      },
+      "extra": {},
+      "missing": {
+        "41202": 1
+      },
+      "name": "SHIELD_VARGUR"
+    },
+    "approved": false,
+    "category": "bastion"
+  }
+}

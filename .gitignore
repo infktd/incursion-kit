@@ -1,0 +1,11 @@
+vendor/
+.env
+.env.*
+!.env.example
+.DS_Store
+target/
+deploy/data/
+deploy/sde/
+deploy/backups/
+deploy/frontend/
+config.toml

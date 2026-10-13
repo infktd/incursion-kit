@@ -1,0 +1,29 @@
+[package]
+name = "waitlist"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+wl-core.workspace = true
+wl-db.workspace = true
+wl-api.workspace = true
+wl-workers.workspace = true
+wl-eve-data.workspace = true
+wl-fitting.workspace = true
+wl-live.workspace = true
+wl-esi.workspace = true
+wl-srp.workspace = true
+tokio = { workspace = true, features = ["net"] }
+axum.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]

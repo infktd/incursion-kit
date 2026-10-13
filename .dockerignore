@@ -1,0 +1,9 @@
+target
+vendor
+.git
+**/.env
+deploy/data
+deploy/sde
+deploy/backups
+deploy/frontend
+config.toml

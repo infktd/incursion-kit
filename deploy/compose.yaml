@@ -1,0 +1,47 @@
+# Development stack: MySQL and Caddy on http://waitlist.localhost:8080. `deploy/dev.sh` starts it
+# and runs the backend on the host; to run the backend in a container instead:
+#   docker compose -f deploy/compose.yaml --profile backend up -d
+# Your frontend's dev server runs separately on the host (port 4321); Caddy proxies to it.
+# Production: see compose.prod.yaml and docs/deploy.md.
+name: incursion-kit
+
+services:
+  mysql:
+    image: mysql:9.7
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: waitlist
+      MYSQL_USER: waitlist
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-waitlist}
+    ports: ["127.0.0.1:3307:3306"]
+    volumes: [mysql:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      retries: 30
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    profiles: [backend]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      WAITLIST__DATABASE__URL: mysql://waitlist:${MYSQL_PASSWORD:-waitlist}@mysql:3306/waitlist
+    volumes:
+      - ./data:/app/data
+      - sde:/app/sde
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2.11
+    ports: ["127.0.0.1:8080:8080"]
+    volumes: [./Caddyfile.dev:/etc/caddy/Caddyfile:ro]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+volumes:
+  mysql:
+  sde:

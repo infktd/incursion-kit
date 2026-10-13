@@ -1,0 +1,657 @@
+---
+#min = minimum to level to get accepted into fleet
+#elite = recommended level
+categories:
+  # List of categories and what skills are in it. All skills must be in one category.
+  Tank:
+    - Explosive Armor Compensation
+    - EM Armor Compensation
+    - Thermal Armor Compensation
+    - Kinetic Armor Compensation
+    - Hull Upgrades
+    - Mechanics
+    - Shield Management
+    - Shield Operation
+    - Shield Compensation
+    - Tactical Shield Manipulation
+  Gunnery:
+    - Controlled Bursts
+    - Motion Prediction
+    - Rapid Firing
+    - Sharpshooter
+    - Surgical Strike
+    - Trajectory Analysis
+    - Large Energy Turret
+    - Large Pulse Laser Specialization
+    - Large Hybrid Turret
+    - Large Blaster Specialization
+    - Large Projectile Turret
+    - Large Autocannon Specialization
+  Navigation:
+    - Navigation
+    - Spaceship Command
+    - Acceleration Control
+    - Evasive Maneuvering
+    - High Speed Maneuvering
+    - Warp Drive Operation
+    - Micro Jump Drive Operation
+    - Afterburner
+    - Fuel Conservation
+    - Armor Rigging
+    - Armor Layering
+
+  Engineering:
+    - Thermodynamics
+    - Capacitor Management
+    - CPU Management
+    - Capacitor Systems Operation
+    - Power Grid Management
+    - Nanite Interfacing
+    - Nanite Operation
+    - Energy Grid Upgrades
+    - Weapon Upgrades
+    - Advanced Weapon Upgrades
+    - Propulsion Jamming
+    - Sensor Linking
+    - Frequency Modulation
+    - Long Distance Jamming
+    - Capacitor Emission Systems
+    - Remote Armor Repair Systems
+    - Remote Hull Repair Systems
+    - Repair Systems
+    - Shield Emission Systems
+  Targeting:
+    - Target Management
+    - Advanced Target Management
+    - Long Range Targeting
+    - Signature Analysis
+    - Radar Sensor Compensation
+    - Ladar Sensor Compensation
+    - Magnetometric Sensor Compensation
+  Neural Enhancement:
+    - Biology
+    - Cybernetics
+    - Science
+    - Neurotoxin Control
+    - Neurotoxin Recovery
+  Spaceship Command:
+    - Amarr Battleship
+    - Gallente Battleship
+    - Minmatar Battleship
+    - Caldari Battleship
+    - Amarr Battlecruiser
+    - Gallente Battlecruiser
+    - Minmatar Battlecruiser
+    - Amarr Cruiser
+    - Gallente Cruiser
+    - Logistics Cruisers
+    - Marauders
+    - Command Ships
+  Fleet Support:
+    - Leadership
+    - Wing Command
+    - Fleet Command
+    - Command Burst Specialist
+    - Armored Command
+    - Armored Command Specialist
+    - Skirmish Command
+    - Skirmish Command Specialist
+    - Information Command
+    - Information Command Specialist
+    - Shield Command
+    - Shield Command Specialist
+  Drones:
+    - Drones
+    - Gallente Drone Specialization
+    - Drone Durability
+    - Drone Navigation
+    - Drone Avionics
+    - Advanced Drone Avionics
+    - Drone Interfacing
+    - Drone Sharpshooting
+    - Electronic Warfare
+    - Light Drone Operation
+    - Medium Drone Operation
+    - Heavy Drone Operation
+    - Repair Drone Operation
+  Subsystems:
+    - Minmatar Offensive Systems
+    - Minmatar Defensive Systems
+    - Minmatar Core Systems
+    - Minmatar Propulsion Systems
+
+requirements:
+  _generic: &generic # Generic skills: everyone needs these
+    Hull Upgrades:
+      min: 4
+      elite: 5
+    Acceleration Control:
+      min: 0
+      elite: 4
+    Evasive Maneuvering:
+      min: 0
+      elite: 4
+    High Speed Maneuvering:
+      min: 1
+      elite: 4
+    Warp Drive Operation:
+      min: 1
+      elite: 5
+    Navigation:
+      min: 1
+      elite: 5
+    Thermodynamics:
+      min: 1
+      elite: 4
+    Capacitor Management:
+      min: 2
+      elite: 5
+    CPU Management:
+      min: 2
+      elite: 5
+    Capacitor Systems Operation:
+      min: 3
+      elite: 5
+    Power Grid Management:
+      min: 1
+      elite: 5
+    Spaceship Command:
+      elite: 5
+    Target Management:
+      min: 3
+      elite: 5
+    Long Range Targeting:
+      min: 0
+      elite: 5
+    Signature Analysis:
+      min: 0
+      elite: 5
+    Biology:
+      min: 0
+      elite: 5
+    Cybernetics:
+      min: 0
+      elite: 5
+      priority: 5
+
+  _armor: &armor # Armor skills: all armor pilots need these
+    EM Armor Compensation:
+      min: 4
+      elite: 5
+    Explosive Armor Compensation:
+      min: 4
+      elite: 5
+    Thermal Armor Compensation:
+      min: 4
+      elite: 5
+    Kinetic Armor Compensation:
+      min: 4
+      elite: 5
+    Armor Layering:
+      min: 0
+      elite: 4
+    Mechanics:
+      min: 4
+      elite: 5
+
+  _shield: &shield # Shields skills: all shield pilots need these
+    Shield Management:
+      min: 4
+      elite: 4
+    Shield Operation:
+      min: 2
+      elite: 4
+    Shield Compensation:
+      min: 4
+      elite: 5
+    Tactical Shield Manipulation:
+      min: 4
+      elite: 4
+  
+  _marauder: &marauder
+    Advanced Weapon Upgrades:
+      min: 5
+      elite: 5
+    Marauders:
+      min: 1
+      elite: 5
+    Micro Jump Drive Operation:
+      min: 1
+      elite: 5
+    Remote Armor Repair Systems:
+      min: 1
+      elite: 5
+    Capacitor Emission Systems:
+      min: 1
+      elite: 5
+    Drones:
+      min: 5
+      elite: 5
+    Light Drone Operation:
+      min: 1
+      elite: 5
+  _booster: &booster # Booster skills: Only boosters need these
+    Acceleration Control:
+      min: 3
+      elite: 4
+    Evasive Maneuvering:
+      min: 3
+      elite: 4
+    High Speed Maneuvering:
+      min: 3
+      elite: 4
+    Warp Drive Operation:
+      min: 3
+      elite: 5
+    Navigation:
+      min: 4
+      elite: 5
+    Thermodynamics:
+      min: 0
+      elite: 4
+    Capacitor Management:
+      min: 4
+      elite: 5
+    CPU Management:
+      min: 5
+    Capacitor Systems Operation:
+      min: 3
+      elite: 5
+    Power Grid Management:
+      min: 5
+    Spaceship Command:
+      min: 5
+    Cybernetics:
+      min: 5
+      priority: 5
+    Micro Jump Drive Operation:
+      min: 1
+      elite: 4
+    Sensor Linking:
+      min: 1
+      elite: 4
+    Leadership:
+      min: 5
+    Wing Command:
+      min: 5
+    Fleet Command:
+      min: 4
+    Command Burst Specialist:
+      min: 4
+    Command Ships:
+      min: 5
+
+  _sideeffects: &sideeffects
+    Neurotoxin Control:
+      elite: 4
+    Neurotoxin Recovery:
+      elite: 4
+    Nanite Interfacing:
+      elite: 4
+    Nanite Operation:
+      elite: 4
+
+  _gunnery: &gunnery # Gunnery skills: need these if you have guns
+    Controlled Bursts:
+      min: 0
+      elite: 4
+    Motion Prediction:
+      min: 0
+      elite: 5
+    Rapid Firing:
+      min: 0
+      elite: 5
+      priority: 2
+    Sharpshooter:
+      min: 0
+      elite: 5
+    Surgical Strike:
+      min: 0
+      elite: 5
+      priority: 2
+    Trajectory Analysis:
+      min: 0
+      elite: 5
+    Weapon Upgrades:
+      min: 1
+      elite: 5
+
+  _logistics: &logistics # Logistics skills: all logi pilots need these
+    EM Armor Compensation:
+      min: 4
+      elite: 5
+    Explosive Armor Compensation:
+      min: 4
+      elite: 5
+    Thermal Armor Compensation:
+      min: 4
+      elite: 5
+    Kinetic Armor Compensation:
+      min: 4
+      elite: 5
+    Armor Layering:
+      min: 0
+      elite: 4
+    Hull Upgrades:
+      min: 5
+    Mechanics:
+      min: 4
+      elite: 5
+    Acceleration Control:
+      min: 3
+      elite: 4
+    Evasive Maneuvering:
+      min: 3
+      elite: 4
+    Warp Drive Operation:
+      min: 3
+      elite: 5
+    Navigation:
+      min: 4
+      elite: 5
+    Thermodynamics:
+      elite: 4
+    Capacitor Management:
+      min: 5
+    CPU Management:
+      min: 3
+      elite: 5
+    Remote Armor Repair Systems:
+      min: 5
+    Repair Systems:
+      min: 2
+      gold: 2
+    Capacitor Systems Operation:
+      min: 5
+    Power Grid Management:
+      min: 3
+      elite: 5
+    Spaceship Command:
+      min: 3
+      elite: 5
+    Nanite Interfacing:
+      elite: 4
+    Nanite Operation:
+      elite: 4
+    Target Management:
+      min: 5
+    Long Range Targeting:
+      min: 5
+    Signature Analysis:
+      min: 5
+    Biology:
+      min: 3
+      elite: 5
+    Advanced Target Management:
+      min: 3
+    Energy Grid Upgrades:
+      min: 2
+
+  _rigging:
+    &rigging # Rigging skills: any ship with rigs that can be improved with rigging skills
+    Armor Rigging:
+      min: 0
+      elite: 4
+
+  # Start of per-ship skills
+  Vargur:
+    <<: [*generic, *shield,*gunnery, *sideeffects, *marauder]
+    Large Projectile Turret:
+      min: 1
+    Large Autocannon Specialization:
+      min: 0
+      elite: 5
+      priority: 10
+    Marauders:
+      min: 1
+      elite: 5
+      priority: 10
+    Micro Jump Drive Operation:
+      min: 1
+      elite: 4
+    Advanced Target Management:
+      min: 0
+      elite: 5
+    Ladar Sensor Compensation:
+      min: 0
+      elite: 4
+    Minmatar Battleship:
+      min: 5
+      elite: 5
+
+  Paladin:
+    <<: [*generic, *armor, *gunnery, *sideeffects, *rigging, *marauder]
+    Large Energy Turret:
+      min: 1
+    Large Pulse Laser Specialization:
+      min: 0
+      elite: 5
+      priority: 10
+    Science:
+      min: 1
+      elite: 5
+    Advanced Target Management:
+      min: 0
+      elite: 4
+    Radar Sensor Compensation:
+      min: 0
+      elite: 4
+    Amarr Battleship:
+      min: 5
+      elite: 5
+
+  Armor Kronos:
+    <<: [*generic, *armor, *gunnery, *sideeffects, *rigging, *marauder]
+    Large Hybrid Turret:
+      min: 1
+    Large Blaster Specialization:
+      min: 0
+      elite: 5
+      priority: 10
+    Marauders:
+      min: 1
+      elite: 5
+      priority: 10
+    Advanced Target Management:
+      min: 5
+      elite: 5
+    Magnetometric Sensor Compensation:
+      min: 5
+      elite: 5
+    Gallente Battleship:
+      min: 5
+      elite: 5
+
+  Shield Kronos:
+    <<: [*generic, *shield, *gunnery, *sideeffects, *marauder]
+    Large Hybrid Turret:
+      min: 1
+    Large Blaster Specialization:
+      min: 0
+      elite: 5
+      priority: 10
+    Advanced Target Management:
+      min: 0
+      elite: 5
+    Magnetometric Sensor Compensation:
+      min: 0
+      elite: 4
+    Gallente Battleship:
+      min: 5
+      elite: 5
+
+  Vindicator:
+    <<: [*generic, *armor, *gunnery, *rigging, *sideeffects]
+    Motion Prediction:
+      min: 1
+      elite: 5
+    Large Hybrid Turret:
+      min: 1
+      elite: 5
+    Large Blaster Specialization:
+      min: 0
+      elite: 4
+      priority: 10
+    Gallente Battleship:
+      min: 3
+      elite: 4
+    Minmatar Battleship:
+      min: 3
+      elite: 5
+      priority: 5
+    Propulsion Jamming:
+      min: 1
+      elite: 4
+    Advanced Target Management:
+      min: 0
+      elite: 4
+    Astronautics Rigging:
+      min: 0
+      elite: 0
+
+  Megathron:
+    <<: [*generic, *gunnery, *sideeffects, *rigging]
+    Gallente Battleship:
+      min: 3
+    Large Hybrid Turret:
+      min: 4
+    Propulsion Jamming:
+      min: 4
+
+  Loki:
+    <<: [*armor, *generic]
+    Evasive Maneuvering:
+      min: 3
+    Ladar Sensor Compensation:
+      min: 0
+      elite: 4
+    Minmatar Cruiser:
+      min: 5
+    CPU Management:
+      min: 3
+    Power Grid Management:
+      min: 5
+    Minmatar Offensive Systems:
+      min: 5
+    Minmatar Defensive Systems:
+      min: 5
+    Minmatar Core Systems:
+      min: 5
+    Minmatar Propulsion Systems:
+      min: 5
+    Nanite Interfacing:
+      min: 0
+      elite: 4
+    Nanite Operation:
+      min: 0
+      elite: 4
+
+  Nestor:
+    <<: [*armor, *logistics, *rigging]
+    EM Armor Compensation:
+      min: 5
+    Explosive Armor Compensation:
+      min: 5
+    Thermal Armor Compensation:
+      min: 5
+    Kinetic Armor Compensation:
+      min: 5
+    Advanced Target Management:
+      min: 2
+    Amarr Battleship:
+      min: 4
+    Gallente Battleship:
+      min: 1
+      elite: 4
+    High Speed Maneuvering:
+      min: 4
+    Magnetometric Sensor Compensation:
+      min: 0
+      elite: 4
+    Shield Emission Systems:
+      min: 1
+      gold: 4
+    Remote Hull Repair Systems:
+      min: 1
+      gold: 4
+    Cybernetics:
+      min: 5
+    Astronautics Rigging:
+      gold: 5
+    Thermodynamics:
+      min: 4
+      elite: 5
+    Drones:
+      min: 5
+    Repair Drone Operation:
+      min: 1
+      elite: 5
+
+  Eos:
+    <<: [*booster, *armor]
+    Leadership:
+      min: 5
+    Wing Command:
+      min: 5
+    Fleet Command:
+      min: 4
+    Command Burst Specialist:
+      min: 4
+    Armored Command:
+      min: 5
+    Armored Command Specialist:
+      min: 5
+    Skirmish Command:
+      min: 5
+    Skirmish Command Specialist:
+      min: 5
+    Command Ships:
+      min: 5
+    Gallente Battlecruiser:
+      min: 5
+
+  Damnation:
+    <<: [*booster, *armor]
+    Leadership:
+      min: 5
+    Wing Command:
+      min: 5
+    Fleet Command:
+      min: 4
+    Command Burst Specialist:
+      min: 4
+    Information Command:
+      min: 5
+    Information Command Specialist:
+      min: 5
+    Skirmish Command:
+      min: 5
+    Skirmish Command Specialist:
+      min: 5
+    Command Ships:
+      min: 5
+    Amarr Battlecruiser:
+      min: 5
+  
+  Claymore:
+    <<: [*booster, *armor]
+    Leadership:
+      min: 5
+    Wing Command:
+      min: 5
+    Fleet Command:
+      min: 4
+    Command Burst Specialist:
+      min: 4
+    Shield Command:
+      min: 5
+    Shield Command Specialist:
+      min: 5
+    Skirmish Command:
+      min: 5
+    Skirmish Command Specialist:
+      min: 5
+    Command Ships:
+      min: 5
+    Minmatar Battlecruiser:
+      min: 5
