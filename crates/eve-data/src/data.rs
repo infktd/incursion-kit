@@ -157,6 +157,11 @@ impl EveData {
         self.types.len()
     }
 
+    /// Every type, in no particular order.
+    pub fn types(&self) -> impl Iterator<Item = &Type> {
+        self.types.values()
+    }
+
     /// Looks up a type by id.
     pub fn get(&self, id: TypeId) -> Option<&Type> {
         self.types.get(&id)

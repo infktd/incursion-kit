@@ -20,6 +20,10 @@ new ones bring their own frontend or build one against the API.
   notices; prices configurable.
 - **Incursion tracker**: active incursions with system roles, influence history, spawn windows and
   a public event stream ([docs/incursions-api.md](docs/incursions-api.md)).
+- **Wiki**: edited in the app by FCs, no Git or deploys: sections, Markdown pages with
+  components (callouts, steps, doctrine fits), drafts and per-role visibility, revisions,
+  images, search, live updates, and an importer for Markdown/MDX wikis
+  ([docs/wiki.md](docs/wiki.md)).
 - **Your community's rules as data**: doctrine fits, skills, categories and community rules live
   in editable files with an admin editor; guides and translations included.
 - **Operations**: one container, automatic migrations and static-data builds, health checks,
@@ -51,6 +55,7 @@ SSO and ESI (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 - [docs/openapi.json](docs/openapi.json): the OpenAPI 3.1 spec of every endpoint (also served at
   `/api/openapi.json`, browsable at `/api/docs`).
 - [docs/incursions-api.md](docs/incursions-api.md): the incursion tracker API.
+- [docs/wiki.md](docs/wiki.md): the wiki: page syntax, permissions, API, import.
 - [CONTRIBUTING.md](CONTRIBUTING.md): development setup, tests, crate map, conventions.
 
 ## ESI from Rust

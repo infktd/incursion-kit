@@ -11,7 +11,7 @@ use wl_eve_data::{EveData, TypeId};
 
 use crate::{DataError, Fitting};
 
-static FIT_LINK: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static FIT_LINK: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"<a href="fitting:([0-9:;_]+)">([^<]+)</a>"#).expect("valid fit link pattern")
 });
 

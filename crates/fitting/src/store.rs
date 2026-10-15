@@ -15,6 +15,10 @@ use crate::{DEFAULT_RULES, DataError, DataFile, DataSet, DataSources};
 /// Backups kept per data file when it is replaced.
 const BACKUPS_KEPT: usize = 5;
 
+/// Called after the data set changed: `Some(file)` when one file was written, `None` after a
+/// reload of every file.
+type Listener = Arc<dyn Fn(Option<DataFile>) + Send + Sync>;
+
 /// The current [`DataSet`], loaded from the data directory.
 ///
 /// Readers take a snapshot with [`DataStore::get`] and never block. Writers (reload, file
@@ -26,6 +30,22 @@ pub struct DataStore {
     current: ArcSwap<DataSet>,
     /// Serializes writers so reloads and file replacements do not interleave.
     writer: Mutex<()>,
+    /// Told about every change (see [`DataStore::on_change`]).
+    listener: Mutex<Option<Listener>>,
+}
+
+/// A structured edit failed: the edit itself rejected the change, or the data set does not load
+/// with the edited file (or a file could not be read or written).
+#[derive(Debug)]
+pub enum EditError<E> {
+    Edit(E),
+    Data(DataError),
+}
+
+impl<E> From<DataError> for EditError<E> {
+    fn from(error: DataError) -> Self {
+        Self::Data(error)
+    }
 }
 
 /// Outcome of validating a data file.
@@ -51,7 +71,27 @@ impl DataStore {
             eve,
             current: ArcSwap::from_pointee(data),
             writer: Mutex::new(()),
+            listener: Mutex::new(None),
         })
+    }
+
+    /// Calls `listener` after every change of the data set: with the file after a file was
+    /// written ([`DataStore::replace_file`], [`DataStore::edit`]), with `None` after
+    /// [`DataStore::reload`]. Replaces an earlier listener. The listener runs on the writing
+    /// thread and must not block.
+    pub fn on_change(&self, listener: impl Fn(Option<DataFile>) + Send + Sync + 'static) {
+        *self.listener.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::new(listener));
+    }
+
+    fn changed(&self, file: Option<DataFile>) {
+        let listener = self
+            .listener
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        if let Some(listener) = listener {
+            listener(file);
+        }
     }
 
     /// A snapshot of the current data set.
@@ -96,6 +136,8 @@ impl DataStore {
         )?);
         self.current.store(data.clone());
         tracing::info!(dir = %self.dir.display(), "reloaded data files");
+        drop(_writer);
+        self.changed(None);
         Ok(data)
     }
 
@@ -112,19 +154,49 @@ impl DataStore {
     /// Validates `content` as `file`, then backs up the current file, writes the new one
     /// atomically and swaps in the new data set. Nothing is written if validation fails.
     pub fn replace_file(&self, file: DataFile, content: &str) -> Result<Validation, DataError> {
-        let _writer = self.writer.lock().unwrap_or_else(PoisonError::into_inner);
+        self.edit(file, false, |_, _| {
+            Ok::<_, DataError>((content.to_string(), ()))
+        })
+        .map(|(validation, ())| validation)
+        .map_err(|error| match error {
+            EditError::Edit(error) | EditError::Data(error) => error,
+        })
+    }
+
+    /// A read-modify-write of one data file, serialized with every other writer.
+    ///
+    /// `edit` gets the file's current contents (from disk; the built-in default for an absent
+    /// `rules.yaml`) and the current data set, and returns the new contents plus a value passed
+    /// back to the caller. The data set must load with the new contents; then, unless `dry_run`,
+    /// the current file is backed up, the new one written atomically, the new data set swapped in
+    /// and the change listener told. With `dry_run` nothing is written.
+    pub fn edit<T, E>(
+        &self,
+        file: DataFile,
+        dry_run: bool,
+        edit: impl FnOnce(&str, &DataSet) -> Result<(String, T), E>,
+    ) -> Result<(Validation, T), EditError<E>> {
+        let writer = self.writer.lock().unwrap_or_else(PoisonError::into_inner);
         let mut sources = DataSources::read_dir(&self.dir)?;
-        sources.set(file, content);
+        let current = self.get();
+        let (content, value) = edit(sources.get(file)?, &current).map_err(EditError::Edit)?;
+        sources.set(file, content.as_str());
         let data = Arc::new(DataSet::load(self.eve.clone(), &sources)?);
+        let validation = Validation {
+            warnings: data.warnings.clone(),
+        };
+        if dry_run {
+            return Ok((validation, value));
+        }
 
         let path = self.path(file);
         backup(&self.dir, file)?;
-        write_atomically(&path, content)?;
-        self.current.store(data.clone());
+        write_atomically(&path, &content)?;
+        self.current.store(data);
         tracing::info!(file = file.file_name(), "data file replaced");
-        Ok(Validation {
-            warnings: data.warnings.clone(),
-        })
+        drop(writer);
+        self.changed(Some(file));
+        Ok((validation, value))
     }
 }
 

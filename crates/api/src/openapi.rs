@@ -38,6 +38,8 @@ pub mod tags {
     pub const CONTENT: &str = "content";
     pub const COMMUNITY: &str = "community";
     pub const ADMIN: &str = "admin";
+    pub const DATA: &str = "data";
+    pub const WIKI: &str = "wiki";
     pub const SRP: &str = "srp";
     pub const INCURSIONS: &str = "incursions";
     pub const HEALTH: &str = "health";
@@ -61,6 +63,8 @@ pub mod tags {
         (name = tags::CONTENT, description = "Guides, guide assets and locales."),
         (name = tags::COMMUNITY, description = "Commanders, bans, badges, announcements and search."),
         (name = tags::ADMIN, description = "Data files and guide assets (administrators)."),
+        (name = tags::DATA, description = "Structured editors for the community data files: doctrine fits, fit notes, implant sets, categories, tags, rules; lookups for pickers."),
+        (name = tags::WIKI, description = "The wiki: sections, pages, revisions, images and search."),
         (name = tags::SRP, description = "Ship replacement program."),
         (name = tags::INCURSIONS, description = "The public incursion tracker."),
         (name = tags::HEALTH, description = "Health check."),

@@ -8,6 +8,7 @@ mod badges;
 mod bans;
 mod categories;
 mod commanders;
+mod data;
 mod fittings;
 mod fleet;
 mod guides;
@@ -27,6 +28,7 @@ mod srp;
 pub mod sse;
 mod statistics;
 mod waitlist;
+mod wiki;
 mod window;
 
 use utoipa_axum::router::OpenApiRouter;
@@ -72,4 +74,6 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .merge(fittings::routes())
         .merge(incursions::routes())
         .merge(public::routes())
+        .merge(data::routes())
+        .merge(wiki::routes())
 }

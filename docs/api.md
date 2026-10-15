@@ -97,8 +97,8 @@ cumulative: each has every key of the roles before it, plus its own.
 | `user` | (none) |
 | `trainee` | `fleet-configure`, `fleet-invite`, `fleet-view`, `pilot-view`, `waitlist-view`, `waitlist-tag:TRAINEE` |
 | `trainee-advanced` | `fit-view`, `skill-view`, `waitlist-manage` |
-| `fc` | `bans-manage`, `badges-manage`, `commanders-view`, `fleet-activity-view`, `fleet-history-view`, `fit-history-view`, `search`, `skill-history-view`, `waitlist-edit`, `stats-view`, `waitlist-tag:HQ-FC`, `notes-view`, `notes-add` |
-| `fc+` | `commanders-manage`, `commanders-manage:trainee`, `commanders-manage:trainee-advanced`, `commanders-manage:fc` |
+| `fc` | `bans-manage`, `badges-manage`, `commanders-view`, `fleet-activity-view`, `fleet-history-view`, `fit-history-view`, `search`, `skill-history-view`, `waitlist-edit`, `stats-view`, `waitlist-tag:HQ-FC`, `notes-view`, `notes-add`, `wiki-edit` |
+| `fc+` | `commanders-manage`, `commanders-manage:trainee`, `commanders-manage:trainee-advanced`, `commanders-manage:fc`, `fits-manage`, `wiki-admin` |
 | `admin` | `commanders-manage:admin`, `commanders-manage:fc+` |
 
 What the keys allow:
@@ -121,7 +121,10 @@ What the keys allow:
 | `stats-view` | Statistics |
 | `commanders-view` | The list of role holders |
 | `commanders-manage`, `commanders-manage:<role>` | Granting and revoking roles; the role-specific key is needed to grant or revoke that role |
-| `commanders-manage:admin` | Site administration: data files, guides and translations, skill plans, SRP administration, waitlists |
+| `fits-manage` | Editing doctrine fits, fit notes and implant sets through the structured data editors (`/api/data/fits`, `/api/data/fit-notes`, `/api/data/implant-sets`), with the type search and picker options (an extension) |
+| `wiki-edit` | Creating, editing, moving, publishing and unpublishing wiki pages; their revisions, diffs and reverts; wiki images; drafts in the wiki index and search (an extension, see [wiki.md](wiki.md)) |
+| `wiki-admin` | Wiki sections, deleting and restoring wiki pages, changing the visibility of others' pages, reading every page whatever its visibility (an extension) |
+| `commanders-manage:admin` | Site administration: data files, guides and translations, skill plans, SRP administration, waitlists; the structured editors for categories, tags and rules |
 
 The OpenAPI spec lists the key each operation needs. Missing it gives `401 access denied`.
 
@@ -137,11 +140,13 @@ From then on, roles are managed with `/api/commanders`.
 
 ## Errors
 
-Every error is a plain-text body with one of these statuses:
+Every error is a plain-text body (except the structured data editors' validation errors, and
+the wiki's JSON errors described in [wiki.md](wiki.md#api)) with one of these statuses:
 
 | Status | Body | When |
 |---|---|---|
 | 400 | a message | invalid input (`type error: …`, `fit error: …`, …), or a failed check |
+| 400 | JSON `{"valid": false, "dry_run", "errors": [{"path", "message"}], "warnings"}` | the structured data editors (`/api/data/*`) only: invalid data, field by field |
 | 401 | `401 Authorization Required` | no valid session on an endpoint that needs one |
 | 401 | `access denied` | missing permission key, or the character isn't yours |
 | 401 | `ESI error: missing ESI scope` / `ESI error: no ESI token found` | the character must log in again (with the needed scopes) |
@@ -162,12 +167,12 @@ Three server-sent event (SSE) streams carry live updates. Each event has a name 
 proxies which buffer pass the response on immediately; keep-alive comments follow every 15
 seconds.
 
-- `GET /api/sse/stream` (logged in): the topics `announcments`, `waitlist` and
-  `account;<account_id>`, plus `fleet_comp` with `fleet-view`. The topic set is fixed when the
+- `GET /api/sse/stream` (logged in): the topics `announcments`, `waitlist`,
+  `account;<account_id>`, `data`, `wiki` and `wiki_restricted`, plus `fleet_comp` with `fleet-view`. The topic set is fixed when the
   stream opens; reconnect after a role change.
 - `GET /api/incursions/stream` (public): the topic `incursions`.
-- `GET /api/public/stream` (public): the topics `status` and `incursions` (an extension; a
-  logged-out page needs only this one).
+- `GET /api/public/stream` (public): the topics `status`, `incursions`, `data` and `wiki` (an
+  extension; a logged-out page needs only this one).
 
 | Topic | Event | Data | Clients |
 |---|---|---|---|
@@ -178,8 +183,12 @@ seconds.
 | `account;<id>` | `message` | `{"message": "New x-up in waitlist"}` (to fleet bosses) | notify |
 | `incursions` | `incursions_update` | `{"spawn_ids", "changes", "influence_changed"}` | refetch `/api/incursions` |
 | `status` | `status_update` | `{"waitlist_id": 1}` | refetch `/api/public/status` |
+| `data` | `data_update` | `{"file": "fits.dat"}` (`null` after a reload of every file) | refetch what comes from the data files (`/api/fittings`, `/api/module/preload`, …) |
+| `wiki`, `wiki_restricted` | `wiki_update` | `{"slug": "guides/newbro" or null, "section": "start" or null, "change": "updated"}` | refetch that page (and the index); `wiki` carries public pages and sections, `wiki_restricted` drafts and gated pages (see [wiki.md](wiki.md#live-updates)) |
 
-`incursions` and `status` are not in the legacy catalogue. `status_update` accompanies every
+`incursions`, `status`, `data`, `wiki` and `wiki_restricted` are not in the legacy catalogue. `data_update` is sent after
+every change of the community data (the structured editors, the raw data-file editor, skill plan
+administration, a reload). `status_update` accompanies every
 `waitlist_update`. `waitlist_update` is also sent where the legacy server was silent (emptying a
 waitlist, an invite or a cleared invite, waitlist administration, fleets registered for a waitlist
 or unregistered): it tells clients that the waitlist, its gate data or its status may have
@@ -263,6 +272,55 @@ merges into hulls with YAML anchors (`<<: *armor`). A hull's entry already conta
 the groups it merges, so a client lists the hulls and can ignore the groups. Rather than relying
 on the `_` prefix, read the additive `requirement_keys`: `{"hulls": [..], "groups": [..]}`, the
 keys of `requirements` split by kind (each sorted).
+
+**Structured data editors.** Typed JSON resources over the community data files under
+`/api/data/*`, for guided editors (forms, no YAML). Doctrine fits, fit notes and implant sets
+need `fits-manage` (`fc+` and above); categories, tags, rules and skill plan validation need
+`commanders-manage:admin`. The raw data-file editor (`/api/admin/data-files`) is unchanged and
+admin-only.
+
+| Resource | Endpoints |
+|---|---|
+| Doctrine fits (`fits.dat`) | `GET/POST /api/data/fits`, `GET/PUT/DELETE /api/data/fits/{name}` (`?hull=<type id>` when several fits share a name). Input `{name, eft?, dna?, section?}`; output adds the hull, normalised DNA and EFT, items by slot (`layout`), the `fits.dat` section, `hidden` and the category. |
+| EFT parsing | `POST /api/data/fits/parse` `{eft}`: `{valid, fit: {name, hull, dna, eft, layout, category, same_as}, errors, warnings}`; nothing is saved. |
+| Fit notes (`fitnotes.yaml`) | `GET/POST /api/data/fit-notes`, `GET/PUT/DELETE /api/data/fit-notes/{name}`: `{name, description}` (output adds `target`: `fit` or `tier`). |
+| Implant sets (`implants.yaml`) | `GET/POST /api/data/implant-sets`, `GET/PUT/DELETE /api/data/implant-sets/{name}`: `{name, slots: [{slot, default: [{name, note?, group?}], alternative}]}`. |
+| Categories (`categories.yaml`) | `GET/PUT /api/data/categories`: `{categories: [{id, name}], rules: [{item, category}]}`. |
+| Tags (`tags.yaml`) | `GET/PUT /api/data/tags`: `{public_tags}`. |
+| Rules (`rules.yaml`) | `GET /api/data/rules`: `{custom, rules: {fit_check, fittings, war, skill_plans, fleet}}`; `PUT` the `rules` object. |
+| Skill plans | `POST /api/data/skill-plans/validate` `{plan, name?}`: a dry run of the skill plan endpoints, with the plan's training steps and hulls. |
+| Pickers | `GET /api/data/types?q=&kind=ship,module&limit=`: type search; `GET /api/data/options`: hulls with their fits, skill sets, tiers, tank levels, categories, tags, sections, plan and implant set names. |
+
+- **Writes and dry runs.** Every `POST`/`PUT`/`DELETE` takes `?dry_run=true`, which runs every
+  check and writes nothing. A write checks the request, then loads the whole data set with the
+  new file; only then is the old file backed up (`<file>.backup.<unix time>`), the new one
+  written atomically, the data set swapped in and `data_update` published. The answer is a
+  `ValidationReport`: `{"valid": true, "dry_run", "errors": [], "warnings": [...]}` with `200`,
+  or the same shape with `"valid": false` and `400`. Each error is `{"path", "message"}` (plus
+  `line` inside EFT text); `path` points into the request (`name`, `slots[2].default[0].name`,
+  `rules[3].item`), and is empty for problems of the resulting data set. Warnings do not stop
+  a save (a skill plan that no longer builds, a category `rules.yaml` names but that does not
+  exist). These are the only JSON error bodies outside the wiki; `401`, `404` (`Fit not found`, …)
+  and `422` stay plain text.
+- **Formatting.** `fits.dat` is edited in place: only the changed link is rewritten, inserted
+  or removed. YAML files are re-serialized from the typed data: the leading comment block is
+  kept, other comments (and YAML anchors and merge keys) are lost, keys keep the file format's
+  order and lists keep their order. The previous version is always in the backups. Files
+  written here are plain YAML (or fitting links) that older servers read.
+- **Names are identifiers.** Fits, notes, implant sets and skill plans are addressed by name,
+  so renaming a fit does not rename the fit notes and skill plans that refer to it; plans that
+  no longer build come back as warnings.
+
+**Wiki.** An in-app wiki under `/api/wiki*`: sections and a numbered index, pages in Markdown
+with directive components (`:::callout`, `::::steps`/`:::step`, `:::details`, `::fit{name=…}`),
+drafts and per-page visibility (public, logged in, or a permission key), full revisions with
+diffs and reverts, optimistic concurrency (`base_revision` / `If-Match`, `409` on a stale
+save), images, ranked search with snippets, backlinks and headings, live `wiki_update` events,
+FC cheatsheets as an unlisted section, and `waitlist wiki import <dir>` for Markdown/MDX pages
+with frontmatter. Reading public pages needs no login; editing needs `wiki-edit` (`fc` and
+above), sections and deletes `wiki-admin` (`fc+` and above). Wiki errors are JSON
+(`{"error", "message", "problems"?, "current_revision"?}`). Everything is described in
+[wiki.md](wiki.md).
 
 ## Health
 

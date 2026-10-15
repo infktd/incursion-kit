@@ -3623,6 +3623,7 @@ dependencies = [
  "wl-fitting",
  "wl-live",
  "wl-srp",
+ "wl-wiki",
  "wl-workers",
 ]
 
@@ -4006,6 +4007,7 @@ dependencies = [
  "wl-incursions",
  "wl-live",
  "wl-srp",
+ "wl-wiki",
  "wl-workers",
 ]
 
@@ -4161,6 +4163,27 @@ dependencies = [
  "wl-esi",
  "wl-eve-data",
  "wl-fitting",
+]
+
+[[package]]
+name = "wl-wiki"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "image",
+ "pretty_assertions",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "similar",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "wl-content",
+ "wl-db",
 ]
 
 [[package]]

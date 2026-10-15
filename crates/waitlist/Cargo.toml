@@ -19,6 +19,7 @@ wl-fitting.workspace = true
 wl-live.workspace = true
 wl-esi.workspace = true
 wl-srp.workspace = true
+wl-wiki.workspace = true
 tokio = { workspace = true, features = ["net"] }
 axum.workspace = true
 clap.workspace = true

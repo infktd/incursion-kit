@@ -79,6 +79,34 @@ pub enum SkillPlanLevel {
 /// `(skill, level)`.
 pub type LevelPair = (TypeId, SkillLevel);
 
+/// A problem with a skill plan found by validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlanProblem {
+    /// Index of the step (0-based), or `None` for the plan itself.
+    pub step: Option<usize>,
+    /// The field: `name`, or a field of the step (`hull`, `fit`, `from`, `tier`, `level`).
+    pub field: &'static str,
+    pub message: String,
+}
+
+impl PlanProblem {
+    /// Path into the plan: `name`, `plan[2].fit`.
+    pub fn path(&self) -> String {
+        match self.step {
+            None => self.field.to_string(),
+            Some(step) => format!("plan[{step}].{}", self.field),
+        }
+    }
+
+    /// The message of the legacy validation error (`Plan step 3: …`, steps counted from 1).
+    pub fn legacy_message(&self) -> String {
+        match self.step {
+            None => self.message.clone(),
+            Some(step) => format!("Plan step {}: {}", step + 1, self.message),
+        }
+    }
+}
+
 /// A plan as sent by `GET /api/skills/plans`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct SkillPlansResponsePlan {
@@ -231,40 +259,55 @@ impl PlanContext<'_> {
         Ok(flatten(graph))
     }
 
-    /// Checks a plan before it is saved (admin endpoints).
+    /// Checks a plan before it is saved (admin endpoints): the first problem of
+    /// [`PlanContext::plan_problems`], with the legacy message.
     pub fn validate_plan(&self, plan: &SkillPlan) -> Result<(), SkillPlanError> {
-        let invalid = |message: String| Err(SkillPlanError::Validation(message));
+        match self.plan_problems(plan).into_iter().next() {
+            None => Ok(()),
+            Some(problem) => Err(SkillPlanError::Validation(problem.legacy_message())),
+        }
+    }
+
+    /// Every problem of a plan, in order: the name, then each step's first problem.
+    pub fn plan_problems(&self, plan: &SkillPlan) -> Vec<PlanProblem> {
+        let mut problems = Vec::new();
         if plan.name.trim().is_empty() {
-            return invalid("Plan name cannot be empty".to_string());
+            problems.push(PlanProblem {
+                step: None,
+                field: "name",
+                message: "Plan name cannot be empty".to_string(),
+            });
         }
         let not_found = TypeError::NothingMatched;
 
         for (index, level) in plan.plan.iter().enumerate() {
-            let step = index + 1;
+            let mut problem = |field: &'static str, message: String| {
+                problems.push(PlanProblem {
+                    step: Some(index),
+                    field,
+                    message,
+                });
+            };
             match level {
                 SkillPlanLevel::Fit { hull, fit } => {
                     let Some(hull_id) = self.eve.id_of(hull) else {
-                        return invalid(format!(
-                            "Plan step {step}: Hull '{hull}' not found: {not_found}"
-                        ));
+                        problem("hull", format!("Hull '{hull}' not found: {not_found}"));
+                        continue;
                     };
                     let hull_fits = self.fits.for_hull(hull_id);
                     if hull_fits.is_empty() {
-                        return invalid(format!(
-                            "Plan step {step}: No fits found for hull '{hull}'"
-                        ));
-                    }
-                    if !hull_fits.iter().any(|candidate| candidate.name == *fit) {
-                        return invalid(format!(
-                            "Plan step {step}: Fit '{fit}' not found for hull '{hull}'"
-                        ));
+                        problem("hull", format!("No fits found for hull '{hull}'"));
+                    } else if !hull_fits.iter().any(|candidate| candidate.name == *fit) {
+                        problem("fit", format!("Fit '{fit}' not found for hull '{hull}'"));
                     }
                 }
                 SkillPlanLevel::Skills { from, tier } => {
                     if crate::SkillTier::parse(tier).is_none() {
-                        return invalid(format!(
-                            "Plan step {step}: Invalid tier '{tier}'. Must be 'min', 'elite', or 'gold'"
-                        ));
+                        problem(
+                            "tier",
+                            format!("Invalid tier '{tier}'. Must be 'min', 'elite', or 'gold'"),
+                        );
+                        continue;
                     }
                     let spaced: Vec<String> = self
                         .rules
@@ -275,39 +318,44 @@ impl PlanContext<'_> {
                     if spaced.iter().any(|prefix| from.contains(prefix.as_str())) {
                         let base = self.rules.base_hull(from);
                         if self.eve.id_of(base).is_none() {
-                            return invalid(format!(
-                                "Plan step {step}: Base ship '{base}' for '{from}' not found: {not_found}"
-                            ));
+                            problem(
+                                "from",
+                                format!("Base ship '{base}' for '{from}' not found: {not_found}"),
+                            );
                         }
                     } else if self.eve.id_of(from).is_none() {
-                        return invalid(format!(
-                            "Plan step {step}: Ship '{from}' not found: {not_found}"
-                        ));
+                        problem("from", format!("Ship '{from}' not found: {not_found}"));
                     }
                 }
                 SkillPlanLevel::Skill { from, level } => {
                     if self.eve.id_of(from).is_none() {
-                        return invalid(format!(
-                            "Plan step {step}: Skill '{from}' not found: {not_found}"
-                        ));
-                    }
-                    if !(1..=5).contains(level) {
-                        return invalid(format!(
-                            "Plan step {step}: Skill level must be between 1 and 5, got {level}"
-                        ));
+                        problem("from", format!("Skill '{from}' not found: {not_found}"));
+                    } else if !(1..=5).contains(level) {
+                        problem(
+                            "level",
+                            format!("Skill level must be between 1 and 5, got {level}"),
+                        );
                     }
                 }
                 SkillPlanLevel::Tank { from } => {
                     if !self.rules.is_tank_level(from) {
-                        return invalid(format!(
-                            "Plan step {step}: Invalid tank level '{from}'. Must be {}",
-                            self.rules.tank_level_list()
-                        ));
+                        problem(
+                            "from",
+                            format!(
+                                "Invalid tank level '{from}'. Must be {}",
+                                self.rules.tank_level_list()
+                            ),
+                        );
                     }
                 }
             }
         }
-        Ok(())
+        problems
+    }
+
+    /// Hulls a plan is for (see [`PlanContext::plan_ships`]).
+    pub fn ships(&self, plan: &SkillPlan) -> Vec<Hull> {
+        self.plan_ships(plan)
     }
 
     /// Hulls a plan is for, as `GET /api/skills/plans` lists them: tank variant names first

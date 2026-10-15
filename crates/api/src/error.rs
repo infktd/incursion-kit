@@ -16,13 +16,18 @@
 //! | [`ApiError::Forbidden`] | 403 | message |
 //! | [`ApiError::NotFound`] | 404 | message |
 //! | [`ApiError::UnprocessableEntity`] | 422 | message (malformed JSON body) |
+//! | [`ApiError::Invalid`] | 400 | JSON [`ValidationReport`] (structured data editors only) |
 //! | [`ApiError::Database`] | 500 | `database error` |
 //! | [`ApiError::Internal`] | 500 | `internal error` |
 
+use axum::Json;
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use serde::Serialize;
+use utoipa::ToSchema;
 use wl_core::EsiError;
 use wl_core::esi_error::BoxError;
+use wl_fitting::editor::FieldError;
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
@@ -54,6 +59,10 @@ pub enum ApiError {
     /// A request body that is not valid JSON for the endpoint.
     #[error("{0}")]
     UnprocessableEntity(String),
+    /// A structured data edit that is not valid: `400` with a JSON [`ValidationReport`] body
+    /// (the only error that is not plain text; the data editor endpoints use it).
+    #[error("invalid data: {}", .0.summary())]
+    Invalid(Box<ValidationReport>),
     /// Anything else that should never happen (serialization bugs, missing services...). The
     /// details are logged, not sent.
     #[error("internal error")]
@@ -77,6 +86,16 @@ impl ApiError {
         Self::Internal(err.into())
     }
 
+    /// A structured edit with these errors.
+    pub fn invalid(dry_run: bool, errors: Vec<FieldError>, warnings: Vec<String>) -> Self {
+        Self::Invalid(Box::new(ValidationReport {
+            valid: false,
+            dry_run,
+            errors,
+            warnings,
+        }))
+    }
+
     pub fn status(&self) -> StatusCode {
         match self {
             Self::Unauthenticated
@@ -93,9 +112,11 @@ impl ApiError {
             Self::NotFound(_) => StatusCode::NOT_FOUND,
             Self::Forbidden(_) => StatusCode::FORBIDDEN,
             Self::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
-            Self::BadRequest(_) | Self::Type(_) | Self::Fit(_) | Self::SkillPlan(_) => {
-                StatusCode::BAD_REQUEST
-            }
+            Self::BadRequest(_)
+            | Self::Type(_)
+            | Self::Fit(_)
+            | Self::SkillPlan(_)
+            | Self::Invalid(_) => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -131,8 +152,52 @@ impl From<wl_workers::Error> for ApiError {
     }
 }
 
+/// The outcome of a structured data edit or its dry run (`?dry_run=true`): the body of a
+/// successful write, and of the `400` of an invalid one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ValidationReport {
+    /// Whether the request is valid (and, unless a dry run, was saved).
+    pub valid: bool,
+    /// Whether this was a dry run: nothing was written.
+    pub dry_run: bool,
+    /// What is wrong, field by field (empty when valid).
+    pub errors: Vec<FieldError>,
+    /// Problems that do not prevent saving, e.g. skill plans that no longer build or rules that
+    /// name a category that does not exist.
+    pub warnings: Vec<String>,
+}
+
+impl ValidationReport {
+    /// A valid request.
+    pub fn valid(dry_run: bool, warnings: Vec<String>) -> Self {
+        Self {
+            valid: true,
+            dry_run,
+            errors: Vec::new(),
+            warnings,
+        }
+    }
+
+    fn summary(&self) -> String {
+        self.errors
+            .iter()
+            .map(|error| {
+                if error.path.is_empty() {
+                    error.message.clone()
+                } else {
+                    format!("{}: {}", error.path, error.message)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        if let Self::Invalid(report) = self {
+            return (StatusCode::BAD_REQUEST, Json(*report)).into_response();
+        }
         let status = self.status();
         if status.is_server_error() {
             tracing::error!(error = %self, details = ?self, "request failed");

@@ -2,8 +2,8 @@
 //!
 //! The legacy waitlist answered with a 307 to a separate SSE server; we stream directly on the
 //! same URL (`EventSource` follows redirects transparently, so clients don't notice). The topic
-//! set is fixed at connect time: `announcments`, `waitlist`, `account;<account_id>`, plus
-//! `fleet_comp` with `fleet-view`. Each event is sent as `event: <name>\ndata: <data>\n\n`. The stream
+//! set is fixed at connect time: `announcments`, `waitlist`, `account;<account_id>`, `data` (an
+//! addition: community data file changes), plus `fleet_comp` with `fleet-view`. Each event is sent as `event: <name>\ndata: <data>\n\n`. The stream
 //! opens with a `: connected` comment, so proxies that buffer pass the response on at once, and
 //! carries periodic keep-alive comments. A subscriber that falls too far behind is disconnected and
 //! reconnects (see `wl_live`).
@@ -40,6 +40,9 @@ pub fn topics_for(account: &AuthenticatedAccount) -> Vec<String> {
         topics::ANNOUNCEMENTS.to_owned(),
         topics::WAITLIST.to_owned(),
         topics::account(account.id),
+        topics::DATA.to_owned(),
+        topics::WIKI.to_owned(),
+        topics::WIKI_RESTRICTED.to_owned(),
     ];
     if account.has_access("fleet-view") {
         topics.push(topics::FLEET_COMP.to_owned());
@@ -50,7 +53,9 @@ pub fn topics_for(account: &AuthenticatedAccount) -> Vec<String> {
 /// Live events
 ///
 /// A server-sent event stream. The topics are fixed at connect time: `announcments`, `waitlist`,
-/// `account;<account_id>` and, with `fleet-view`, `fleet_comp`. Each event is
+/// `account;<account_id>`, `data` (community data file changes, an extension), `wiki` and
+/// `wiki_restricted` (`wiki_update` on wiki changes, extensions) and, with `fleet-view`,
+/// `fleet_comp`. Each event is
 /// `event: <name>` + `data: <JSON or text>`. The stream opens with a `: connected` comment;
 /// keep-alive comments follow every 15 seconds. A
 /// client that falls too far behind is disconnected and should reconnect and refetch. See

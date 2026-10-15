@@ -109,7 +109,7 @@ plus `cargo deny check` (licences and advisories) and a Docker build.
 
 | Crate | |
 |---|---|
-| `waitlist` (`crates/waitlist`) | The binary: `serve`, `migrate`, `sde`, `init-data`, `openapi`, `healthcheck`. Wires everything together. |
+| `waitlist` (`crates/waitlist`) | The binary: `serve`, `migrate`, `sde`, `init-data`, `wiki import`, `openapi`, `healthcheck`. Wires everything together. |
 | `wl-api` (`crates/api`) | The HTTP API (axum): routes, sessions, permissions, error mapping, the OpenAPI spec. Start with its [README](crates/api/README.md). |
 | `wl-core` (`crates/core`) | Configuration and wire types shared by several crates. |
 | `wl-db` (`crates/db`) | MySQL pool, migrations (`crates/db/migrations`), legacy-database adoption, test databases. |
@@ -120,6 +120,7 @@ plus `cargo deny check` (licences and advisories) and a Docker build.
 | `wl-live` (`crates/live`) | The in-process hub behind the server-sent event streams. |
 | `wl-srp` (`crates/srp`) | Ship replacement program: reports, coverage, wallet reconciliation. |
 | `wl-incursions` (`crates/incursions`) | The incursion tracker: spawn history, system roles, spawn windows. |
+| `wl-wiki` (`crates/wiki`) | The wiki: sections, pages, revisions, images, search, Markdown directive validation and the Markdown/MDX importer ([docs/wiki.md](docs/wiki.md)). |
 | `wl-workers` (`crates/workers`) | Background workers: fleet, skill, war and incursion updaters and the tracker. |
 | `dev-esi` (`crates/dev-esi`) | Development only: a fake EVE SSO and ESI with a control API, for running the stack (and end-to-end tests) without a CCP account. |
 

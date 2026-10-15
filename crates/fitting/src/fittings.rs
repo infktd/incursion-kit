@@ -24,7 +24,8 @@ struct NoteFile {
 /// One implant in the implant guide.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct ImplantEntry {
-    /// Implant type name.
+    /// The implant as shown (and copied) on the fits page: its type name or a short form such
+    /// as `WS-618`.
     pub name: String,
     /// Free-text remark shown with the implant.
     #[serde(default, skip_serializing_if = "Option::is_none")]

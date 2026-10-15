@@ -13,7 +13,7 @@ use crate::{
     SkillPlanError, SkillPlans,
     diff::{DiffResult, diff},
     fittings, matcher,
-    skillplans::{LevelPair, PlanContext, parse_skill_plans},
+    skillplans::{LevelPair, PlanContext, PlanProblem, parse_skill_plans},
 };
 
 /// Every data file, parsed and resolved. Immutable; a reload builds a new one.
@@ -142,6 +142,16 @@ impl DataSet {
     /// Validates a plan before an admin saves it.
     pub fn validate_plan(&self, plan: &SkillPlan) -> Result<(), SkillPlanError> {
         self.plan_context().validate_plan(plan)
+    }
+
+    /// Every validation problem of a plan, with field paths.
+    pub fn plan_problems(&self, plan: &SkillPlan) -> Vec<PlanProblem> {
+        self.plan_context().plan_problems(plan)
+    }
+
+    /// The hulls (or hull variants) a plan is for, as `GET /api/skills/plans` lists them.
+    pub fn plan_ships(&self, plan: &SkillPlan) -> Vec<wl_core::types::Hull> {
+        self.plan_context().ships(plan)
     }
 }
 

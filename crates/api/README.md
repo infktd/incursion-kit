@@ -82,7 +82,8 @@ async fn info(
 
 ## Errors
 
-`ApiError` (`src/error.rs`) mirrors the legacy error mapping exactly. Every body is plain text:
+`ApiError` (`src/error.rs`) mirrors the legacy error mapping exactly. Every body is plain text,
+except the structured data editors' validation errors:
 
 | Variant | Status | Body |
 |---|---|---|
@@ -94,6 +95,7 @@ async fn info(
 | `Forbidden(msg)` | 403 | `msg` |
 | `NotFound(msg)` | 404 | `msg` |
 | `UnprocessableEntity(msg)` | 422 | `msg` |
+| `Invalid(report)` | 400 | JSON `ValidationReport` (`{valid, dry_run, errors: [{path, message, line?}], warnings}`); only the structured data editors (`routes/data/`) use it |
 | `Database`, `Internal`, other ESI errors | 500 | `database error` / `internal error` / `ESI error: …` |
 
 Server errors are logged with their details, and the details are never sent to the client.
@@ -163,6 +165,9 @@ wires every service. Tests wire only the services they use.
 - `state.content()`: locales, guides and guide images (`wl-content`), always present, rooted at
   `config.data.dir`. Its operations are blocking file I/O: run them through
   `routes::blocking(..)`.
+- `state.wiki()`: the wiki service (`wl-wiki`), built per call over the pool, the content
+  directory and the shared search cache; it publishes `wiki_update` live events. Wiki routes
+  (`routes/wiki.rs`) answer JSON errors (`wl_wiki::WikiError`), not `ApiError`.
 - `state.esi()`, `state.eve_data()`, `state.data_store()` (`wl-fitting`'s community data).
 - Ban checks shared between routes live in `src/ban.rs`.
 

@@ -42,6 +42,15 @@ pub mod topics {
     /// Public waitlist status changes, for everyone (served on the public `/api/public/stream`,
     /// not on the authenticated stream). Not part of the legacy catalogue.
     pub const STATUS: &str = "status";
+    /// Community data file changes, for everyone (served on the authenticated and the public
+    /// stream). Not part of the legacy catalogue.
+    pub const DATA: &str = "data";
+    /// Wiki changes readable by everyone: public, published pages and sections (served on the
+    /// authenticated and the public stream). Not part of the legacy catalogue.
+    pub const WIKI: &str = "wiki";
+    /// Wiki changes of pages anonymous visitors can't see (drafts, login- or permission-gated
+    /// pages), on the authenticated stream only. Not part of the legacy catalogue.
+    pub const WIKI_RESTRICTED: &str = "wiki_restricted";
 
     /// The per-account topic: `account;<account_id>` (account id = main character id).
     pub fn account(account_id: i64) -> String {
@@ -69,6 +78,13 @@ pub mod events {
     /// On [`super::topics::STATUS`]: JSON `{"waitlist_id": i64}`; clients refetch
     /// `/api/public/status`.
     pub const STATUS_UPDATE: &str = "status_update";
+    /// On [`super::topics::DATA`]: JSON `{"file": "fits.dat"}` (`null` after a reload of every
+    /// file); clients refetch what they show from the data files (`/api/fittings`, …).
+    pub const DATA_UPDATE: &str = "data_update";
+    /// On [`super::topics::WIKI`] and [`super::topics::WIKI_RESTRICTED`]: JSON
+    /// `{"slug": "guides/newbro" or null, "section": key or null, "change": "updated"}`; clients
+    /// showing that page (or the index, for any event) refetch.
+    pub const WIKI_UPDATE: &str = "wiki_update";
 }
 
 /// One published event, shared between all subscribers that receive it.
@@ -249,6 +265,13 @@ impl Hub {
         let data = format!("{{\"waitlist_id\":{waitlist_id}}}");
         self.publish(topics::WAITLIST, events::WAITLIST_UPDATE, data.clone());
         self.publish(topics::STATUS, events::STATUS_UPDATE, data);
+    }
+
+    /// A community data file changed (`file`, e.g. `fits.dat`), or every file was reloaded
+    /// (`None`): `data_update` on [`topics::DATA`] with the JSON data `{"file": <name or null>}`.
+    pub fn data_changed(&self, file: Option<&str>) {
+        let data = serde_json::json!({ "file": file }).to_string();
+        self.publish(topics::DATA, events::DATA_UPDATE, data);
     }
 
     /// Number of currently connected subscribers.

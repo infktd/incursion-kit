@@ -20,7 +20,7 @@ use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetReques
 use tower_http::trace::TraceLayer;
 
 pub use auth::AuthenticatedAccount;
-pub use error::{ApiError, ApiResult};
+pub use error::{ApiError, ApiResult, ValidationReport};
 pub use extract::JsonBody;
 pub use state::AppState;
 

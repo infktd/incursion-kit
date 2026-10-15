@@ -1,0 +1,31 @@
+[package]
+name = "wl-wiki"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+wl-db.workspace = true
+wl-content.workspace = true
+sqlx.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr.workspace = true
+utoipa.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+similar.workspace = true
+
+[dev-dependencies]
+wl-db = { workspace = true, features = ["test-support"] }
+tokio.workspace = true
+tempfile.workspace = true
+pretty_assertions.workspace = true
+image.workspace = true

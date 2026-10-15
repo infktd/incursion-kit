@@ -53,6 +53,11 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Wiki maintenance.
+    Wiki {
+        #[command(subcommand)]
+        command: WikiCommand,
+    },
     /// Print the OpenAPI 3.1 description of the HTTP API (JSON) and exit. Needs no config.
     Openapi,
     /// Check that the local server answers `GET /healthz` (exit code 0 = healthy). Meant for
@@ -61,6 +66,21 @@ enum Command {
         /// Port to probe. Defaults to the port of `server.bind`, or 5000.
         #[arg(long)]
         port: Option<u16>,
+    },
+}
+
+#[derive(Subcommand)]
+enum WikiCommand {
+    /// Import Markdown/MDX pages with frontmatter from a static-site wiki: `<dir>/wiki/**`,
+    /// `<dir>/wiki-sections/*.yaml` and `<dir>/fc-cheatsheets/*` (see docs/wiki.md). Existing
+    /// pages with the same path get a new revision when they differ. Nothing is written when any
+    /// file has an error.
+    Import {
+        /// The content directory.
+        dir: std::path::PathBuf,
+        /// Check everything and report what would change, without writing.
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -118,6 +138,9 @@ async fn run(command: Command) -> anyhow::Result<()> {
     match command {
         Command::Serve => serve(config).await,
         Command::Migrate { adopt } => migrate(config, adopt).await,
+        Command::Wiki {
+            command: WikiCommand::Import { dir, dry_run },
+        } => wiki_import(config, &dir, dry_run).await,
         Command::Sde { .. } | Command::InitData { .. } => {
             unreachable!("handled before loading the config")
         }
@@ -140,6 +163,53 @@ async fn migrate(config: Config, adopt: bool) -> anyhow::Result<()> {
         tracing::info!("migrations are up to date");
     }
     db.close().await;
+    Ok(())
+}
+
+/// `waitlist wiki import <dir>`: plan, report problems, write in one transaction.
+async fn wiki_import(config: Config, dir: &std::path::Path, dry_run: bool) -> anyhow::Result<()> {
+    let plan = {
+        let dir = dir.to_path_buf();
+        tokio::task::spawn_blocking(move || wl_wiki::import::plan(&dir))
+            .await
+            .context("reading the import directory panicked")?
+    };
+    let db = wl_db::connect(&config.database).await?;
+    wl_db::migrate(&db).await?;
+    let wiki = wl_wiki::Wiki::new(db.clone(), &config.data.dir, Default::default());
+    let report = wiki
+        .import(&plan, dry_run)
+        .await
+        .map_err(|e| anyhow::anyhow!("import failed: {e}"))?;
+    db.close().await;
+    for warning in &report.warnings {
+        tracing::warn!("{warning}");
+    }
+    for error in &report.errors {
+        tracing::error!("{error}");
+    }
+    if !report.errors.is_empty() {
+        anyhow::bail!(
+            "{} error(s) in {}: nothing was imported",
+            report.errors.len(),
+            dir.display()
+        );
+    }
+    tracing::info!(
+        dry_run,
+        sections_created = report.sections_created,
+        sections_updated = report.sections_updated,
+        sections_unchanged = report.sections_unchanged,
+        pages_created = report.pages_created,
+        pages_updated = report.pages_updated,
+        pages_unchanged = report.pages_unchanged,
+        "{}",
+        if dry_run {
+            "wiki import checked (dry run, nothing written)"
+        } else {
+            "wiki imported"
+        }
+    );
     Ok(())
 }
 

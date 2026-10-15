@@ -46,6 +46,7 @@ pub struct AppState {
     data_store: Option<Arc<DataStore>>,
     srp: Option<Srp>,
     war_cache: WarCache,
+    wiki_search: wl_wiki::SearchCache,
 }
 
 impl std::fmt::Debug for AppState {
@@ -72,6 +73,7 @@ impl AppState {
             data_store: None,
             srp: None,
             war_cache: WarCache::new(),
+            wiki_search: wl_wiki::SearchCache::default(),
         })
     }
 
@@ -91,8 +93,12 @@ impl AppState {
         self
     }
 
-    /// The community data files (fits, categories, skills, ...).
+    /// The community data files (fits, categories, skills, ...). Every change of the data set
+    /// (an edit through the API or a reload) is announced as `data_update` on the live `data`
+    /// topic.
     pub fn with_data_store(mut self, data_store: Arc<DataStore>) -> Self {
+        let live = self.live.clone();
+        data_store.on_change(move |file| live.data_changed(file.map(|file| file.file_name())));
         self.data_store = Some(data_store);
         self
     }
@@ -158,6 +164,28 @@ impl AppState {
     /// Affiliation refresh (character/corporation/alliance from ESI). Needs the ESI client.
     pub fn affiliation(&self) -> Result<Affiliation, ApiError> {
         Ok(Affiliation::new(self.esi()?.clone(), self.db.clone()))
+    }
+
+    /// The wiki (`wl-wiki`): pages in the database, images under the content directory's
+    /// `wiki/assets`. Every change is announced as `wiki_update`: on the `wiki` topic when
+    /// anonymous visitors could see the page (before or after), else on `wiki_restricted`.
+    pub fn wiki(&self) -> wl_wiki::Wiki {
+        let live = self.live.clone();
+        wl_wiki::Wiki::new(
+            self.db.clone(),
+            self.content.dir(),
+            self.wiki_search.clone(),
+        )
+        .with_notifier(move |change| {
+            let topic = if change.public {
+                wl_live::topics::WIKI
+            } else {
+                wl_live::topics::WIKI_RESTRICTED
+            };
+            if let Err(error) = live.publish_json(topic, wl_live::events::WIKI_UPDATE, change) {
+                tracing::error!(%error, "could not encode a wiki event");
+            }
+        })
     }
 
     /// Whether cookies get the `Secure` attribute (the public site is HTTPS).

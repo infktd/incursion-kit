@@ -251,18 +251,23 @@ customises. Its layout is the original waitlist's, so an existing directory work
 | `rules.yaml` | Optional community rules (below). |
 | `locales/` | UI translations: `<page>.<locale>.json` and `languages.json`. |
 | `guides/<slug>/` | Guides (`<slug>.<locale>.json`, Markdown body) and their images. |
+| `wiki/assets/` | Wiki images (`<id>.<ext>`); the wiki's pages are in the database ([wiki.md](wiki.md)). |
 
 **First run.** An empty (or missing) data directory gets the bundled example data set, so the
 server starts with something to show. `waitlist init-data` writes it explicitly; `--force` writes
 it into a non-empty directory, overwriting files of the same name. Replace the example files with
 your own: through the admin data-file editor (`/api/admin/data-files`, which applies changes
-immediately), or by hand followed by a restart. Translations and guides are read on every
+immediately), through the structured editors (`/api/data/*`, forms in a frontend; FCs with
+`fc+` can edit fits, notes and implant sets there, see [api.md](api.md)), or by hand followed by
+a restart. Translations and guides are read on every
 request, so hand edits to them show up at once.
 
 **Edits are safe.** The admin endpoints validate a community data file against the whole data set
 before writing anything, write it atomically and keep the previous versions as
-`<file>.backup.<unix time>`. A file edited by hand that doesn't load stops the server from
-starting, with an error naming the file.
+`<file>.backup.<unix time>` (the newest five per file). The structured editors re-write YAML
+files from their data, so comments other than the comment block at the top of the file are
+lost; edit by hand (or restore a backup) to keep them. A file edited by hand that doesn't load
+stops the server from starting, with an error naming the file.
 
 **`rules.yaml`** holds what the original waitlist hard-coded for its community: tags granted by
 roles and badges, badge auto-approval, implant/module combinations, hours-in-fleet limits, the

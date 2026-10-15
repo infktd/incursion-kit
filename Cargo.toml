@@ -29,6 +29,7 @@ wl-srp = { path = "crates/srp" }
 wl-incursions = { path = "crates/incursions" }
 wl-workers = { path = "crates/workers" }
 wl-api = { path = "crates/api" }
+wl-wiki = { path = "crates/wiki" }
 
 # runtime
 tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "time", "sync", "signal"] }
@@ -73,6 +74,7 @@ config = { version = "0.15.27", default-features = false, features = ["toml"] }
 thiserror = "2.0.21"
 anyhow = "1.0.104"
 regex = "1.13.1"
+similar = "2.7.0"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 tracing = "0.1.44"

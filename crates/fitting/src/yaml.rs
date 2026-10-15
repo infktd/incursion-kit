@@ -27,3 +27,18 @@ pub(crate) fn to_string<T: Serialize>(file: DataFile, value: &T) -> Result<Strin
         message: error.to_string(),
     })
 }
+
+/// Like [`to_string`], with list items indented under their key (`key:\n  - item`), the style
+/// of the hand-written data files.
+pub(crate) fn to_string_indented<T: Serialize>(
+    file: DataFile,
+    value: &T,
+) -> Result<String, DataError> {
+    let options = serde_saphyr::ser_options! {
+        compact_list_indent: false,
+    };
+    serde_saphyr::to_string_with_options(value, options).map_err(|error| DataError::Yaml {
+        file: file.file_name(),
+        message: error.to_string(),
+    })
+}

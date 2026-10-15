@@ -5,108 +5,143 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use wl_eve_data::{NameResolver, SkillLevel, TypeId};
 
 use crate::{DataError, DataFile, yaml};
 
 const FILE: &str = "rules.yaml";
 
-#[derive(Deserialize)]
+/// `rules.yaml` as written. Type names are resolved when the data set loads.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct RulesFile {
-    fit_check: FitCheckFile,
-    fittings: FittingsRules,
-    war: WarRules,
-    skill_plans: SkillPlansFile,
+pub struct RulesDocument {
+    pub fit_check: FitCheckSection,
+    pub fittings: FittingsRules,
+    pub war: WarRules,
+    pub skill_plans: SkillPlansSection,
     /// Optional so that a `rules.yaml` copied before this section existed keeps working: the
     /// built-in section applies then.
-    #[serde(default)]
-    fleet: Option<FleetRulesFile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fleet: Option<FleetSection>,
 }
 
-#[derive(Deserialize)]
+/// `fleet`: roles assigned in the fleet MOTD.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct FleetRulesFile {
-    motd_roles: Vec<MotdRoleFile>,
-    motd_link_type: i64,
+pub struct FleetSection {
+    /// Roles written in the MOTD as `<NAME>: <pilot links>`; names are matched
+    /// case-insensitively, contain no whitespace or `:` and are unique.
+    pub motd_roles: Vec<MotdRoleEntry>,
+    /// `showinfo:<type>//<id>` link type for pilots added to the MOTD (1377 = Character).
+    pub motd_link_type: i64,
 }
 
-#[derive(Deserialize)]
+/// A fleet MOTD role.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct MotdRoleFile {
-    name: String,
+pub struct MotdRoleEntry {
+    pub name: String,
+    /// Hull names the role should fly.
     #[serde(default)]
-    hulls: Vec<String>,
+    pub hulls: Vec<String>,
 }
 
-#[derive(Deserialize)]
+/// `fit_check`: fit checker rules.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct FitCheckFile {
-    default_category: String,
+pub struct FitCheckSection {
+    /// Category id of fits that match no rule of `categories.yaml`.
+    pub default_category: String,
+    /// Access keys that tag the holder's fits; the first match wins, and then no badge tags
+    /// are added.
     #[serde(default)]
-    access_tags: Vec<AccessTag>,
+    pub access_tags: Vec<AccessTag>,
+    /// Badges copied onto fits as tags.
     #[serde(default)]
-    badge_tags: Vec<String>,
+    pub badge_tags: Vec<String>,
+    /// Hulls approved without a doctrine check for holders of a badge.
     #[serde(default)]
-    badge_auto_approve: Vec<BadgeApprovalFile>,
+    pub badge_auto_approve: Vec<BadgeApprovalEntry>,
+    /// Named implant sets (implant type names); a pilot has a set when every implant is
+    /// plugged in.
     #[serde(default)]
-    implant_sets: BTreeMap<String, Vec<String>>,
+    pub implant_sets: BTreeMap<String, Vec<String>>,
     #[serde(default)]
-    implant_module_rules: Vec<ImplantModuleRuleFile>,
+    pub implant_module_rules: Vec<ImplantModuleRuleEntry>,
     #[serde(default)]
-    time_in_fleet_limits: Vec<TimeInFleetLimitFile>,
+    pub time_in_fleet_limits: Vec<TimeInFleetLimitEntry>,
 }
 
-#[derive(Deserialize)]
+/// A hull approved without a doctrine check for pilots holding a badge.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct BadgeApprovalFile {
-    hull: String,
-    badge: String,
+pub struct BadgeApprovalEntry {
+    /// Hull name.
+    pub hull: String,
+    pub badge: String,
 }
 
-#[derive(Deserialize)]
+/// Fitting `module` while having (`has_set: true`) or lacking an implant set adds `tag` and
+/// blocks auto-approval, except on the exempt hulls.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct ImplantModuleRuleFile {
-    implant_set: String,
-    has_set: bool,
-    module: String,
-    tag: String,
+pub struct ImplantModuleRuleEntry {
+    /// A key of `implant_sets`.
+    pub implant_set: String,
+    pub has_set: bool,
+    /// Module name.
+    pub module: String,
+    pub tag: String,
+    /// Hull names.
     #[serde(default)]
-    exempt_hulls: Vec<String>,
+    pub exempt_hulls: Vec<String>,
 }
 
-#[derive(Deserialize)]
+/// More than `max_hours` in fleet on a hull adds `tag` and blocks auto-approval, unless the fit
+/// has `unless_tag`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct TimeInFleetLimitFile {
-    hull: String,
-    max_hours: i64,
-    #[serde(default)]
-    unless_tag: Option<String>,
-    tag: String,
+pub struct TimeInFleetLimitEntry {
+    /// Hull name.
+    pub hull: String,
+    pub max_hours: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unless_tag: Option<String>,
+    pub tag: String,
 }
 
-#[derive(Deserialize)]
+/// `skill_plans`: how skill plans pick skill sets and tank levels.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct SkillPlansFile {
-    generic_skill_set: String,
+pub struct SkillPlansSection {
+    /// Skill set (a `requirements` key of `skills.yaml`) whose priorities order tank and
+    /// single-skill plan steps.
+    pub generic_skill_set: String,
+    /// Skill sets named `<prefix> <hull>` are tank variants of that hull.
     #[serde(default)]
-    variant_prefixes: Vec<String>,
+    pub variant_prefixes: Vec<String>,
+    /// Hulls whose skill set depends on the doctrine fit's name.
     #[serde(default)]
-    hull_variants: Vec<HullVariants>,
-    tank_levels: Vec<TankLevelFile>,
-    default_tank_level: String,
+    pub hull_variants: Vec<HullVariants>,
+    /// Levels accepted by `type: tank` plan steps, in the order error messages list them.
+    pub tank_levels: Vec<TankLevelEntry>,
+    /// A `tank_levels` name, used for unknown levels.
+    pub default_tank_level: String,
 }
 
-#[derive(Deserialize)]
+/// The skills of a `type: tank` plan level.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-struct TankLevelFile {
-    name: String,
-    skills: BTreeMap<String, SkillLevel>,
+pub struct TankLevelEntry {
+    pub name: String,
+    /// Skill name → level.
+    #[schema(value_type = BTreeMap<String, i8>)]
+    pub skills: BTreeMap<String, SkillLevel>,
 }
 
 /// An access key that tags the account's fits.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AccessTag {
     pub access: String,
@@ -153,7 +188,7 @@ pub struct FitCheckRules {
 }
 
 /// Rules for the public fittings list.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FittingsRules {
     /// Doctrine fits whose name contains this are not listed.
@@ -163,7 +198,7 @@ pub struct FittingsRules {
 }
 
 /// X-up restrictions for pilots whose corporation or alliance is at war.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WarRules {
     /// Category ids that cannot be x'd up while at war.
@@ -173,7 +208,7 @@ pub struct WarRules {
 }
 
 /// Picks the skill set of a doctrine fit by its name.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FitNameVariant {
     pub fit_name_contains: String,
@@ -181,7 +216,7 @@ pub struct FitNameVariant {
 }
 
 /// A hull with several skill sets.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HullVariants {
     /// Hull name, as written in skill plans.
@@ -339,12 +374,12 @@ pub struct CommunityRules {
 
 impl CommunityRules {
     pub(crate) fn load(content: &str, names: &mut NameResolver<'_>) -> Result<Self, DataError> {
-        let file: RulesFile = yaml::parse(DataFile::Rules, content)?;
+        let file: RulesDocument = yaml::parse(DataFile::Rules, content)?;
         let fit_check = load_fit_check(file.fit_check, names)?;
         let skill_plans = load_skill_plans(file.skill_plans, names)?;
         let fleet = match file.fleet {
             Some(fleet) => fleet,
-            None => yaml::parse::<RulesFile>(DataFile::Rules, crate::DEFAULT_RULES)?
+            None => yaml::parse::<RulesDocument>(DataFile::Rules, crate::DEFAULT_RULES)?
                 .fleet
                 .ok_or_else(|| DataError::invalid(FILE, "built-in rules lack `fleet`"))?,
         };
@@ -359,7 +394,7 @@ impl CommunityRules {
     }
 }
 
-fn load_fleet(file: FleetRulesFile, names: &mut NameResolver<'_>) -> Result<FleetRules, DataError> {
+fn load_fleet(file: FleetSection, names: &mut NameResolver<'_>) -> Result<FleetRules, DataError> {
     let mut motd_roles: Vec<MotdRole> = Vec::new();
     for role in file.motd_roles {
         let name = role.name.trim().to_string();
@@ -394,7 +429,7 @@ fn resolve_all(names: &mut NameResolver<'_>, list: &[String], context: &str) -> 
 }
 
 fn load_fit_check(
-    file: FitCheckFile,
+    file: FitCheckSection,
     names: &mut NameResolver<'_>,
 ) -> Result<FitCheckRules, DataError> {
     let badge_auto_approve = file
@@ -477,7 +512,7 @@ fn load_fit_check(
 }
 
 fn load_skill_plans(
-    file: SkillPlansFile,
+    file: SkillPlansSection,
     names: &mut NameResolver<'_>,
 ) -> Result<SkillPlanRules, DataError> {
     for variants in &file.hull_variants {

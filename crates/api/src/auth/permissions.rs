@@ -39,12 +39,15 @@ const ROLE_GRANTS: [&[&str]; 6] = [
         "waitlist-tag:HQ-FC",
         "notes-view",
         "notes-add",
+        "wiki-edit",
     ],
     &[
         "commanders-manage",
         "commanders-manage:trainee",
         "commanders-manage:trainee-advanced",
         "commanders-manage:fc",
+        "fits-manage",
+        "wiki-admin",
     ],
     &["commanders-manage:admin", "commanders-manage:fc+"],
 ];
@@ -78,9 +81,9 @@ mod tests {
         assert!(levels["user"].is_empty());
         assert_eq!(levels["trainee"].len(), 6);
         assert_eq!(levels["trainee-advanced"].len(), 9);
-        assert_eq!(levels["fc"].len(), 22);
-        assert_eq!(levels["fc+"].len(), 26);
-        assert_eq!(levels["admin"].len(), 28);
+        assert_eq!(levels["fc"].len(), 23);
+        assert_eq!(levels["fc+"].len(), 29);
+        assert_eq!(levels["admin"].len(), 31);
         for pair in ROLES.windows(2) {
             assert!(levels[pair[0]].is_subset(&levels[pair[1]]), "{pair:?}");
         }
@@ -90,6 +93,12 @@ mod tests {
         assert!(!levels["fc"].contains("commanders-manage"));
         assert!(levels["fc+"].contains("commanders-manage:fc"));
         assert!(!levels["fc+"].contains("commanders-manage:admin"));
+        assert!(levels["fc+"].contains("fits-manage") && levels["admin"].contains("fits-manage"));
+        assert!(!levels["fc"].contains("fits-manage"));
+        assert!(
+            levels["fc"].contains("wiki-edit") && !levels["trainee-advanced"].contains("wiki-edit")
+        );
+        assert!(levels["fc+"].contains("wiki-admin") && !levels["fc"].contains("wiki-admin"));
     }
 
     #[test]

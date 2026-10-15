@@ -16,6 +16,7 @@ mod check;
 mod dataset;
 mod diff;
 mod doctrine;
+pub mod editor;
 mod error;
 pub mod example_data;
 mod files;
@@ -50,10 +51,10 @@ pub use rules::{
     TimeInFleetLimit, WarRules,
 };
 pub use skillplans::{
-    LevelPair, SkillPlan, SkillPlanError, SkillPlanLevel, SkillPlans, SkillPlansResponse,
-    SkillPlansResponsePlan, parse_skill_plans, skill_plans_to_yaml,
+    LevelPair, PlanProblem, SkillPlan, SkillPlanError, SkillPlanLevel, SkillPlans,
+    SkillPlansResponse, SkillPlansResponsePlan, parse_skill_plans, skill_plans_to_yaml,
 };
 pub use skills::{
     SkillCategories, SkillData, SkillRequirements, SkillTier, SkillTiers, is_skill_group,
 };
-pub use store::{DataStore, Validation};
+pub use store::{DataStore, EditError, Validation};
