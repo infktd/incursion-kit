@@ -131,6 +131,11 @@ impl DataSources {
         self.files.insert(file, content.into());
     }
 
+    /// The contents of a file as read or set, `None` for an absent optional file.
+    pub(crate) fn raw(&self, file: DataFile) -> Option<&str> {
+        self.files.get(&file).map(String::as_str)
+    }
+
     /// The contents of a file (the built-in default for an absent optional file).
     pub fn get(&self, file: DataFile) -> Result<&str, DataError> {
         match (self.files.get(&file), file) {

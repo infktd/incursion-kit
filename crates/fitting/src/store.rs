@@ -176,11 +176,41 @@ impl DataStore {
         dry_run: bool,
         edit: impl FnOnce(&str, &DataSet) -> Result<(String, T), E>,
     ) -> Result<(Validation, T), EditError<E>> {
+        self.commit(dry_run, Some(file), |sources, data| {
+            let (content, value) = edit(sources.get(file)?, data).map_err(EditError::Edit)?;
+            sources.set(file, content);
+            Ok(value)
+        })
+    }
+
+    /// A read-modify-write of several data files at once (a doctrine fit and its implant set
+    /// link), serialized with every other writer.
+    ///
+    /// `edit` gets every file's current contents (from disk) to change in place, and the current
+    /// data set. The data set must load with every change; then, unless `dry_run`, each file
+    /// whose contents changed is backed up and written atomically (one after the other), the new
+    /// data set swapped in and the change listener told once per written file.
+    pub fn edit_files<T, E>(
+        &self,
+        dry_run: bool,
+        edit: impl FnOnce(&mut DataSources, &DataSet) -> Result<T, EditError<E>>,
+    ) -> Result<(Validation, T), EditError<E>> {
+        self.commit(dry_run, None, edit)
+    }
+
+    /// Runs `edit` on the sources, loads the data set and writes the changed files (and
+    /// `always`, changed or not).
+    fn commit<T, E>(
+        &self,
+        dry_run: bool,
+        always: Option<DataFile>,
+        edit: impl FnOnce(&mut DataSources, &DataSet) -> Result<T, EditError<E>>,
+    ) -> Result<(Validation, T), EditError<E>> {
         let writer = self.writer.lock().unwrap_or_else(PoisonError::into_inner);
-        let mut sources = DataSources::read_dir(&self.dir)?;
+        let original = DataSources::read_dir(&self.dir)?;
+        let mut sources = original.clone();
         let current = self.get();
-        let (content, value) = edit(sources.get(file)?, &current).map_err(EditError::Edit)?;
-        sources.set(file, content.as_str());
+        let value = edit(&mut sources, &current)?;
         let data = Arc::new(DataSet::load(self.eve.clone(), &sources)?);
         let validation = Validation {
             warnings: data.warnings.clone(),
@@ -189,13 +219,20 @@ impl DataStore {
             return Ok((validation, value));
         }
 
-        let path = self.path(file);
-        backup(&self.dir, file)?;
-        write_atomically(&path, &content)?;
+        let written: Vec<DataFile> = DataFile::ALL
+            .into_iter()
+            .filter(|&file| Some(file) == always || sources.raw(file) != original.raw(file))
+            .collect();
+        for &file in &written {
+            backup(&self.dir, file)?;
+            write_atomically(&self.path(file), sources.get(file)?)?;
+            tracing::info!(file = file.file_name(), "data file replaced");
+        }
         self.current.store(data);
-        tracing::info!(file = file.file_name(), "data file replaced");
         drop(writer);
-        self.changed(Some(file));
+        for file in written {
+            self.changed(Some(file));
+        }
         Ok((validation, value))
     }
 }

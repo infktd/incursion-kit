@@ -978,7 +978,8 @@ struct AssetList {
 
 /// Wiki images
 ///
-/// Every uploaded image, newest first. Requires `wiki-edit`. An extension beyond the legacy
+/// Every uploaded image, newest first, each with `used_by`: the live pages (that the viewer
+/// may see) whose current body shows it. Requires `wiki-edit`. An extension beyond the legacy
 /// API.
 #[utoipa::path(
     get,
@@ -1102,28 +1103,43 @@ async fn get_asset(
         .into_response())
 }
 
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+struct DeleteAssetQuery {
+    /// `true`: delete the image even when pages show it (they get a broken image).
+    #[serde(default)]
+    force: bool,
+}
+
 /// Delete a wiki image
 ///
-/// Deletes an uploaded image; pages that show it get a broken image. Requires `wiki-edit`.
-/// An extension beyond the legacy API.
+/// Deletes an uploaded image. An image that live pages still show (their current body
+/// references its URL) is not deleted: `409 conflict` with `used_by`, the pages the viewer may
+/// see (the message counts every page). `?force=true` deletes it anyway; those pages then show
+/// a broken image. Requires `wiki-edit`. An extension beyond the legacy API.
 #[utoipa::path(
     delete,
     path = "/api/wiki/assets/{id}",
     operation_id = "wiki_delete_asset",
     tag = tags::WIKI,
     security(("session" = ["wiki-edit"])),
-    params(("id" = i64, Path, description = "Image id.")),
+    params(("id" = i64, Path, description = "Image id."), DeleteAssetQuery),
     responses(
         (status = 200, description = "Deleted.", body = Deleted),
         (status = 401, description = "`unauthenticated` or `access_denied`.", body = ErrorBody),
         (status = 404, description = "`not_found`.", body = ErrorBody),
+        (status = 409, description = "`conflict`: pages show the image (see `used_by`); pass `force=true` to delete it anyway.", body = ErrorBody),
     ),
 )]
 async fn delete_asset(
     State(state): State<AppState>,
     account: Option<AuthenticatedAccount>,
     Path(id): Path<i64>,
+    Query(q): Query<DeleteAssetQuery>,
 ) -> WikiResult<Json<Deleted>> {
-    state.wiki().delete_asset(&viewer(&account), id).await?;
+    state
+        .wiki()
+        .delete_asset(&viewer(&account), id, q.force)
+        .await?;
     Ok(Json(Deleted { id }))
 }

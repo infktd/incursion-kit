@@ -251,7 +251,14 @@ pub struct Diff {
     /// Title of each side.
     pub from_title: String,
     pub to_title: String,
+    /// Whether the summary or `for` differ between the two sides.
     pub summary_changed: bool,
+    /// Summary of each side.
+    pub from_summary: String,
+    pub to_summary: String,
+    /// `for` (who the page is for) of each side; `null` when unset.
+    pub from_for: Option<String>,
+    pub to_for: Option<String>,
     pub insertions: usize,
     pub deletions: usize,
     /// The body diff as a unified diff (3 lines of context).
@@ -273,6 +280,9 @@ pub struct Asset {
     pub size: i64,
     pub uploaded_at: i64,
     pub uploaded_by: Option<CharacterRef>,
+    /// Live pages whose current body shows the image (references its URL), by title; only
+    /// pages the viewer may see. Old revisions and deleted pages are not counted.
+    pub used_by: Vec<PageLink>,
 }
 
 /// A piece of a search snippet.
@@ -323,6 +333,9 @@ pub struct ErrorBody {
     /// `conflict` on a stale save: the page's current revision.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_revision: Option<i64>,
+    /// `conflict` deleting an image that pages still show: those pages.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub used_by: Option<Vec<PageLink>>,
 }
 
 /// `POST /api/wiki/pages`.

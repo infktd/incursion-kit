@@ -228,6 +228,9 @@ pub struct WikiError {
     pub message: String,
     pub problems: Vec<Problem>,
     pub current_revision: Option<i64>,
+    /// A `conflict` deleting an image that pages show: those pages (the ones the viewer may
+    /// see).
+    pub used_by: Vec<model::PageLink>,
     #[source]
     pub source: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
@@ -241,6 +244,7 @@ impl WikiError {
             message: message.into(),
             problems: Vec::new(),
             current_revision: None,
+            used_by: Vec::new(),
             source: None,
         }
     }
@@ -328,6 +332,8 @@ impl WikiError {
             message: self.message.clone(),
             problems: (!self.problems.is_empty()).then(|| self.problems.clone()),
             current_revision: self.current_revision,
+            used_by: (self.kind == ErrorKind::Conflict && !self.used_by.is_empty())
+                .then(|| self.used_by.clone()),
         }
     }
 }

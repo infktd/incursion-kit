@@ -146,14 +146,14 @@ Writes (JSON bodies; `wiki-edit` unless noted):
 | `DELETE /api/wiki/pages/{id}` | Soft delete (`wiki-admin`). |
 | `GET /api/wiki/deleted`, `POST /api/wiki/pages/{id}/restore` `{section?}` | Deleted pages; restore (`wiki-admin`). |
 | `GET /api/wiki/pages/{id}/revisions`, `/revisions/{revision_id}` | History (newest first) and one revision. |
-| `GET /api/wiki/pages/{id}/diff?from=&to=` | Line diff of the body (`lines [{op, old_line, new_line, text}]`, `unified`, counts, title/summary changes); `to` defaults to the current revision. |
+| `GET /api/wiki/pages/{id}/diff?from=&to=` | Line diff of the body (`lines [{op, old_line, new_line, text}]`, `unified`, counts), and both sides' `from_title`/`to_title`, `from_summary`/`to_summary` and `from_for`/`to_for` (with `summary_changed` when the summary or `for` differ); `to` defaults to the current revision. |
 | `POST /api/wiki/pages/{id}/revert` | `{revision, base_revision?, message?}`: the old content as a new revision. |
 | `POST /api/wiki/validate` | `{body}`: validation without saving. |
-| `GET /api/wiki/assets`, `POST /api/wiki/assets?filename=x.png` (raw bytes), `DELETE /api/wiki/assets/{id}` | Images. |
+| `GET /api/wiki/assets`, `POST /api/wiki/assets?filename=x.png` (raw bytes), `DELETE /api/wiki/assets/{id}?force=` | Images; the list has `used_by` per image, and deleting one that pages show is a `409` unless `force=true` (see Images below). |
 | `POST /api/wiki/sections`, `PUT /api/wiki/sections/{key}`, `DELETE /api/wiki/sections/{key}`, `POST /api/wiki/sections/order` `{keys}` | Sections (`wiki-admin`); only an empty section can be deleted. |
 
 **Errors are JSON** on every wiki endpoint (unlike the legacy API's plain text):
-`{"error": code, "message": text, "problems"?: […], "current_revision"?: id}`.
+`{"error": code, "message": text, "problems"?: […], "current_revision"?: id, "used_by"?: [{slug, title}]}`.
 
 | Status | `error` | When |
 |---|---|---|
@@ -161,7 +161,7 @@ Writes (JSON bodies; `wiki-edit` unless noted):
 | 400 | `invalid_markdown` | body problems, with `problems` |
 | 401 | `unauthenticated` / `access_denied` | not logged in / missing `wiki-edit` or `wiki-admin` (as elsewhere, a missing key is a 401) |
 | 404 | `not_found` | no such page, revision, section or image, or one the reader may not see |
-| 409 | `conflict` | a stale base revision (with `current_revision`), a taken path, a non-empty section |
+| 409 | `conflict` | a stale base revision (with `current_revision`), a taken path, a non-empty section, an image that pages show (with `used_by`) |
 | 413 | `too_large` | a body over 512 KiB, an image over 10 MiB |
 | 422 | `invalid_json` | a body that isn't the expected JSON |
 | 428 | `precondition_required` | a content change without a base revision |
@@ -179,6 +179,12 @@ edge 1600 px) and re-encoded, an opaque PNG becoming a JPEG (the answer has the 
 `filename` and `url`). They are served to anyone who has the URL, with
 `Cache-Control: public, max-age=31536000, immutable` and
 `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`.
+`GET /api/wiki/assets` lists each image's `used_by: [{slug, title}]`: the live pages whose
+current body references its URL (`/api/wiki/assets/<id>/…`, relative or absolute, in an image,
+a link or a directive), ordered by title, limited to pages the editor may see. Old revisions
+and deleted pages don't count. `DELETE /api/wiki/assets/{id}` refuses an image in use with
+`409 conflict`, `used_by` and a message counting every page; `?force=true` deletes it anyway,
+and those pages then show a broken image.
 
 ## Search
 

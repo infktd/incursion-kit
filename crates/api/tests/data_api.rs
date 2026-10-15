@@ -162,6 +162,7 @@ async fn doctrine_fits_round_trip() {
     assert_eq!(vindi["hull"]["name"], "Vindicator");
     assert_eq!(vindi["section"], "OTHER");
     assert_eq!(vindi["category"], "other");
+    assert_eq!(vindi["implant_set"], Value::Null);
     assert!(!vindi["layout"]["high"].as_array().unwrap().is_empty());
     let one: Value = env.get("/api/data/fits/ARMOR_VINDI", me).await.json();
     assert_eq!(one, vindi);
@@ -196,7 +197,7 @@ async fn doctrine_fits_round_trip() {
     assert_eq!(dry.status, 200, "{}", dry.text());
     assert_eq!(
         report(&dry),
-        json!({ "valid": true, "dry_run": true, "errors": [], "warnings": [] })
+        json!({ "valid": true, "dry_run": true, "errors": [], "warnings": [], "warning_details": [] })
     );
     assert_eq!(read(&env, "fits.dat"), before);
 
@@ -232,26 +233,47 @@ async fn doctrine_fits_round_trip() {
             .any(|fit| fit["name"] == "NEW_VINDI")
     );
 
-    // Update: rename and change the fit by DNA.
+    // Update: rename, change the fit by DNA and link it to an implant set.
     let paladin = fits.iter().find(|f| f["name"] == "ARMOR_PALADIN").unwrap();
     let res = env
         .send_json(
             Method::PUT,
             "/api/data/fits/NEW_VINDI",
             me,
-            &json!({ "name": "NEW_PALADIN", "dna": paladin["dna"] }),
+            &json!({ "name": "NEW_PALADIN", "dna": paladin["dna"], "implant_set": "Implants" }),
         )
         .await;
     assert_eq!(res.status, 200, "{}", res.text());
     let renamed: Value = env.get("/api/data/fits/NEW_PALADIN", me).await.json();
     assert_eq!(renamed["dna"], paladin["dna"]);
     assert_eq!(renamed["section"], "OTHER", "stays where it was");
+    assert_eq!(renamed["implant_set"], "Implants");
     assert_eq!(env.get("/api/data/fits/NEW_VINDI", me).await.status, 404);
+    let set: Value = env.get("/api/data/implant-sets/Implants", me).await.json();
+    assert_eq!(set["fits"], json!(["NEW_PALADIN"]));
+    let public: Value = env.get("/api/fittings", None).await.json();
+    let public_fit = |name: &str| {
+        public["fittingdata"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|fit| fit["name"] == name)
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(public_fit("NEW_PALADIN")["implant_set"], "Implants");
+    // Fits without a set have no `implant_set` key, as before.
+    assert_eq!(
+        public_fit("ARMOR_VINDI"),
+        json!({ "name": "ARMOR_VINDI", "dna": vindi["dna"] })
+    );
 
-    // Delete: the file is as before.
+    // Delete: the file is as before, and the fit leaves its set.
     let res = env.delete("/api/data/fits/NEW_PALADIN", me).await;
     assert_eq!(res.status, 200, "{}", res.text());
     assert_eq!(read(&env, "fits.dat"), before);
+    let set: Value = env.get("/api/data/implant-sets/Implants", me).await.json();
+    assert_eq!(set.get("fits"), None);
     assert_eq!(
         env.delete("/api/data/fits/NEW_PALADIN", me).await.status,
         404
@@ -318,6 +340,45 @@ async fn fit_errors_are_structured() {
     assert_eq!(parsed["valid"], false);
     assert_eq!(parsed["fit"], Value::Null);
     assert_eq!(parsed["errors"][0]["line"], 1);
+
+    // Warnings come as text and structured, like errors.
+    let parsed: Value = env
+        .post_json(
+            "/api/data/fits/parse",
+            me,
+            &json!({ "eft": "[Vindicator, a]\nNeutron Blaster Cannon II, Void L\n" }),
+        )
+        .await
+        .json();
+    assert_eq!(parsed["valid"], true);
+    let message = "the loaded charge \"Void L\" is ignored; put charges in the cargo";
+    assert_eq!(parsed["warnings"], json!([format!("line 2: {message}")]));
+    assert_eq!(
+        parsed["warning_details"],
+        json!([{ "path": "eft", "line": 2, "message": message }])
+    );
+    let res = env
+        .post_json(
+            "/api/data/fits?dry_run=true",
+            me,
+            &json!({ "name": "W", "eft": "[Vindicator, a]\nNeutron Blaster Cannon II, Void L\n" }),
+        )
+        .await;
+    assert_eq!(res.status, 200, "{}", res.text());
+    assert_eq!(
+        report(&res)["warning_details"],
+        json!([{ "path": "eft", "line": 2, "message": message }])
+    );
+
+    // An unknown implant set is an error with the others.
+    let res = env
+        .post_json(
+            "/api/data/fits",
+            me,
+            &json!({ "name": "", "dna": "1:2:3", "implant_set": "Nope" }),
+        )
+        .await;
+    assert_eq!(paths(&res), ["name", "dna", "implant_set"]);
 
     // Bad JSON stays a plain-text 422.
     let res = env
@@ -487,6 +548,11 @@ async fn categories_tags_and_rules_round_trip() {
             .as_str()
             .unwrap()
             .contains("categories not defined")
+    );
+    assert_eq!(report(&res)["warning_details"][0]["path"], "");
+    assert_eq!(
+        report(&res)["warning_details"][0]["message"],
+        report(&res)["warnings"][0]
     );
 
     let res = env

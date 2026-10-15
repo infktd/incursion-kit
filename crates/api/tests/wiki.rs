@@ -456,7 +456,9 @@ async fn concurrency_revisions_diff_and_revert() {
                 Some(&w.fcplus),
             )
             .header(header::IF_MATCH, format!("\"{r2}\""))
-            .body(Body::from(json!({"title": "P2"}).to_string()))
+            .body(Body::from(
+                json!({"title": "P2", "summary": "S2", "for": "Logi"}).to_string(),
+            ))
             .unwrap(),
         )
         .await;
@@ -505,6 +507,15 @@ async fn concurrency_revisions_diff_and_revert() {
     );
     assert_eq!(diff["from_title"], "P");
     assert_eq!(diff["to_title"], "P2");
+    assert_eq!(diff["summary_changed"], true);
+    assert_eq!(
+        (&diff["from_summary"], &diff["to_summary"]),
+        (&json!(""), &json!("S2"))
+    );
+    assert_eq!(
+        (&diff["from_for"], &diff["to_for"]),
+        (&Value::Null, &json!("Logi"))
+    );
     assert!(
         diff["unified"]
             .as_str()
@@ -972,19 +983,40 @@ async fn images() {
             .exists()
     );
 
+    // A page that shows the image.
+    create_ok(
+        &w,
+        json!({"slug": "pics", "title": "Pictures", "section": "start",
+               "body": format!("![shot]({url})\n")}),
+    )
+    .await;
     let list: Value = w.app.get("/api/wiki/assets", Some(&w.fc)).await.json();
     assert_eq!(list["assets"].as_array().unwrap().len(), 2);
     assert_eq!(list["assets"][0]["id"], shot["id"]);
+    assert_eq!(
+        list["assets"][0]["used_by"],
+        json!([{"slug": "pics", "title": "Pictures"}])
+    );
+    assert_eq!(list["assets"][1]["used_by"], json!([]));
 
-    let res = w
-        .app
-        .send_json(
-            Method::DELETE,
-            &format!("/api/wiki/assets/{}", shot["id"]),
-            Some(&w.fc),
-            &json!({}),
-        )
-        .await;
+    // In use: a conflict naming the pages, unless forced.
+    let delete = |query: &'static str| {
+        let path = format!("/api/wiki/assets/{}{query}", shot["id"]);
+        let w = &w;
+        async move {
+            w.app
+                .send_json(Method::DELETE, &path, Some(&w.fc), &json!({}))
+                .await
+        }
+    };
+    let res = delete("").await;
+    assert_eq!((res.status.as_u16(), error(&res)), (409, "conflict".into()));
+    assert_eq!(
+        res.json::<Value>()["used_by"],
+        json!([{"slug": "pics", "title": "Pictures"}])
+    );
+    assert_eq!(w.app.get(url, None).await.status, 200);
+    let res = delete("?force=true").await;
     assert_eq!(res.status, 200);
     assert_eq!(w.app.get(url, None).await.status, 404);
     assert!(

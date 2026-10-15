@@ -6,9 +6,11 @@ use serde::Serialize;
 use wl_eve_data::{Category, EveData};
 
 use super::{Edited, Problems, Rejection, check_name, write_yaml};
-use crate::{DataFile, ImplantEntry, ImplantSet, fittings};
+use crate::{DataFile, DataSet, ImplantEntry, ImplantSet, fittings};
 
 const MAX_NAME: usize = 100;
+/// Doctrine fit names are at most this long (see the fits editor).
+const MAX_FIT_NAME: usize = 100;
 
 #[derive(Serialize)]
 struct ImplantFile<'a> {
@@ -25,7 +27,10 @@ fn check_entries(eve: &EveData, problems: &mut Problems, path: &str, entries: &[
                 .by_name(&entry.name)
                 .is_some_and(|ty| ty.category != Category::Implant)
         {
-            problems.warn(format!("{path}.name: {:?} is not an implant", entry.name));
+            problems.warn(
+                format!("{path}.name"),
+                format!("{:?} is not an implant", entry.name),
+            );
         }
         for (field, value) in [("note", &entry.note), ("group", &entry.group)] {
             if value
@@ -38,7 +43,8 @@ fn check_entries(eve: &EveData, problems: &mut Problems, path: &str, entries: &[
     }
 }
 
-fn check(eve: &EveData, set: &ImplantSet, sets: &[ImplantSet], except: Option<usize>) -> Problems {
+fn check(data: &DataSet, set: &ImplantSet, sets: &[ImplantSet], except: Option<usize>) -> Problems {
+    let eve = data.eve();
     let mut problems = Problems::default();
     check_name(&mut problems, "name", &set.name, MAX_NAME);
     if sets
@@ -75,14 +81,41 @@ fn check(eve: &EveData, set: &ImplantSet, sets: &[ImplantSet], except: Option<us
             &slot.alternative,
         );
     }
+    let mut listed = BTreeSet::new();
+    for (index, fit) in set.fits.iter().enumerate() {
+        let path = format!("fits[{index}]");
+        if !check_name(&mut problems, &path, fit, MAX_FIT_NAME) {
+            continue;
+        }
+        if !listed.insert(fit.as_str()) {
+            problems.error(path, format!("{fit:?} is listed twice"));
+            continue;
+        }
+        if let Some(other) = sets
+            .iter()
+            .enumerate()
+            .find(|(i, other)| Some(*i) != except && other.fits.contains(fit))
+            .map(|(_, other)| other)
+        {
+            problems.error(
+                path,
+                format!(
+                    "{fit:?} already uses the implant set {:?}: take it out of that set first",
+                    other.name
+                ),
+            );
+        } else if data.fits.iter().all(|doctrine| doctrine.name != *fit) {
+            problems.warn(path, format!("no doctrine fit is named {fit:?}"));
+        }
+    }
     problems
 }
 
-fn current(content: &str) -> Result<Vec<ImplantSet>, Rejection> {
+pub(super) fn current(content: &str) -> Result<Vec<ImplantSet>, Rejection> {
     fittings::load_implants(content).map_err(|error| Rejection::invalid("", error.to_string()))
 }
 
-fn save(content: &str, sets: &[ImplantSet], problems: Problems) -> Edited {
+pub(super) fn save(content: &str, sets: &[ImplantSet], problems: Problems) -> Edited {
     if problems.has_errors() {
         return Err(problems.into());
     }
@@ -98,18 +131,18 @@ fn position(sets: &[ImplantSet], name: &str) -> Result<usize, Rejection> {
 }
 
 /// Appends an implant set to `content` (`implants.yaml`).
-pub fn create_implant_set(content: &str, eve: &EveData, set: &ImplantSet) -> Edited {
+pub fn create_implant_set(content: &str, data: &DataSet, set: &ImplantSet) -> Edited {
     let mut sets = current(content)?;
-    let problems = check(eve, set, &sets, None);
+    let problems = check(data, set, &sets, None);
     sets.push(set.clone());
     save(content, &sets, problems)
 }
 
 /// Replaces (and possibly renames) the implant set `name`.
-pub fn update_implant_set(content: &str, eve: &EveData, name: &str, set: &ImplantSet) -> Edited {
+pub fn update_implant_set(content: &str, data: &DataSet, name: &str, set: &ImplantSet) -> Edited {
     let mut sets = current(content)?;
     let index = position(&sets, name)?;
-    let problems = check(eve, set, &sets, Some(index));
+    let problems = check(data, set, &sets, Some(index));
     sets[index] = set.clone();
     save(content, &sets, problems)
 }

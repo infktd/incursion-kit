@@ -5,12 +5,16 @@
 //! an opaque PNG becoming a JPEG. Files are named by id, so a URL never changes meaning; an
 //! upload with the same file name is a new image.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use sqlx::FromRow;
 
-use crate::model::{Asset, CharacterRef};
+use crate::model::{Asset, CharacterRef, PageLink, Status, Visibility};
 use crate::{ErrorKind, Viewer, Wiki, WikiError, WikiResult, now};
+
+/// The path prefix of image URLs (see [`asset_url`]).
+const URL_PREFIX: &str = "/api/wiki/assets/";
 
 /// Largest accepted upload.
 pub const MAX_ASSET_BYTES: usize = 10 * 1024 * 1024;
@@ -42,7 +46,50 @@ impl Row {
                 id,
                 name: self.name.unwrap_or_else(|| format!("#{id}")),
             }),
+            used_by: Vec::new(),
         }
+    }
+}
+
+/// The ids of the images a page body references: every `/api/wiki/assets/{id}/` in the text
+/// (Markdown images, links, MDX attributes; relative or absolute URLs).
+pub fn referenced_assets(body: &str) -> BTreeSet<i64> {
+    body.match_indices(URL_PREFIX)
+        .filter_map(|(start, _)| {
+            let rest = &body[start + URL_PREFIX.len()..];
+            let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+            (digits > 0 && rest[digits..].starts_with('/'))
+                .then(|| rest[..digits].parse().ok())
+                .flatten()
+        })
+        .collect()
+}
+
+/// A live page whose body references an image.
+#[derive(Debug, FromRow)]
+struct UsageRow {
+    slug: String,
+    title: String,
+    status: String,
+    visibility: String,
+    permission: Option<String>,
+    body: String,
+}
+
+/// The pages using each image: every page, and the ones `viewer` may see.
+#[derive(Debug, Default)]
+struct Usage {
+    total: BTreeMap<i64, usize>,
+    visible: BTreeMap<i64, Vec<PageLink>>,
+}
+
+impl Usage {
+    fn count(&self, id: i64) -> usize {
+        self.total.get(&id).copied().unwrap_or_default()
+    }
+
+    fn visible(&self, id: i64) -> Vec<PageLink> {
+        self.visible.get(&id).cloned().unwrap_or_default()
     }
 }
 
@@ -175,14 +222,50 @@ impl Wiki {
         row.ok_or_else(|| WikiError::not_found("image not found"))
     }
 
-    /// Every image, newest first (`wiki-edit`).
+    /// Which live pages show which images, from the current bodies.
+    async fn usage(&self, viewer: &Viewer) -> WikiResult<Usage> {
+        let rows: Vec<UsageRow> = sqlx::query_as(
+            "SELECT slug, title, status, visibility, permission, body FROM wiki_page \
+             WHERE deleted_at IS NULL AND body LIKE '%/api/wiki/assets/%' ORDER BY title, id",
+        )
+        .fetch_all(&self.db)
+        .await?;
+        let mut usage = Usage::default();
+        for row in rows {
+            let visible = viewer.can_view(
+                Visibility::parse(&row.visibility).unwrap_or(Visibility::Permission),
+                row.permission.as_deref(),
+                Status::parse(&row.status).unwrap_or(Status::Draft),
+            );
+            for id in referenced_assets(&row.body) {
+                *usage.total.entry(id).or_default() += 1;
+                if visible {
+                    usage.visible.entry(id).or_default().push(PageLink {
+                        slug: row.slug.clone(),
+                        title: row.title.clone(),
+                    });
+                }
+            }
+        }
+        Ok(usage)
+    }
+
+    /// Every image, newest first, with the pages that show it (`wiki-edit`).
     pub async fn assets(&self, viewer: &Viewer) -> WikiResult<Vec<Asset>> {
         viewer.require_edit()?;
         let rows: Vec<Row> =
             sqlx::query_as(sqlx::AssertSqlSafe(format!("{SELECT} ORDER BY a.id DESC")))
                 .fetch_all(&self.db)
                 .await?;
-        Ok(rows.into_iter().map(Row::into_asset).collect())
+        let usage = self.usage(viewer).await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let mut asset = row.into_asset();
+                asset.used_by = usage.visible(asset.id);
+                asset
+            })
+            .collect())
     }
 
     /// An image's bytes and content type (public: anyone with the URL may load it).
@@ -199,10 +282,25 @@ impl Wiki {
         Ok((row.into_asset(), bytes))
     }
 
-    /// Delete an image (`wiki-edit`). Pages that show it get a broken image.
-    pub async fn delete_asset(&self, viewer: &Viewer, id: i64) -> WikiResult<()> {
+    /// Delete an image (`wiki-edit`). An image that live pages show is a `conflict` (with
+    /// `used_by`) unless `force`; forced, those pages get a broken image.
+    pub async fn delete_asset(&self, viewer: &Viewer, id: i64, force: bool) -> WikiResult<()> {
         viewer.require_edit()?;
         let row = self.asset_row(id).await?;
+        if !force {
+            let usage = self.usage(viewer).await?;
+            let count = usage.count(id);
+            if count > 0 {
+                let mut e = WikiError::conflict(format!(
+                    "the image is shown by {count} page{}: remove it from {} first, or delete \
+                     with `force=true`",
+                    if count == 1 { "" } else { "s" },
+                    if count == 1 { "that page" } else { "them" },
+                ));
+                e.used_by = usage.visible(id);
+                return Err(e);
+            }
+        }
         sqlx::query("DELETE FROM wiki_asset WHERE id = ?")
             .bind(id)
             .execute(&self.db)
@@ -221,6 +319,18 @@ impl Wiki {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_referenced_images() {
+        let body = "![a](/api/wiki/assets/3/a.png) [b](https://x.y/api/wiki/assets/12/b%20c.jpg)\n\
+                    <Img src=\"/api/wiki/assets/3/again.png\" /> /api/wiki/assets/7 \
+                    /api/wiki/assets/x/ /api/wiki/assets/40/";
+        assert_eq!(
+            referenced_assets(body).into_iter().collect::<Vec<_>>(),
+            [3, 12, 40]
+        );
+        assert!(referenced_assets("no images").is_empty());
+    }
 
     #[test]
     fn urls_are_encoded() {

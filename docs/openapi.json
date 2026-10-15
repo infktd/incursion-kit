@@ -4447,7 +4447,7 @@
           "data"
         ],
         "summary": "List doctrine fits",
-        "description": "Every doctrine fit of `fits.dat` in file order, hidden alternatives included: name, hull,\nnormalised DNA, EFT text, items by slot, the `fits.dat` section it is listed under, whether\nthe public list hides it, and the waitlist category it lands in. Requires `fits-manage`. An\nextension beyond the legacy API.",
+        "description": "Every doctrine fit of `fits.dat` in file order, hidden alternatives included: name, hull,\nnormalised DNA, EFT text, items by slot, the `fits.dat` section it is listed under, whether\nthe public list hides it, the waitlist category it lands in, and the implant set it uses.\nRequires `fits-manage`. An extension beyond the legacy API.",
         "operationId": "data_list_fits",
         "responses": {
           "200": {
@@ -4494,7 +4494,7 @@
           "data"
         ],
         "summary": "Create a doctrine fit",
-        "description": "Adds a fitting link to `fits.dat`, given as EFT text and/or DNA (both must describe the same\nfit). The fit goes after the last fit of `section` (a new section is appended), or after the\nlast fit. Names are unique. Everything else in `fits.dat` is left as it is. Validated (with\nfield paths; EFT problems carry their `line`), then the whole data set must load; then the\nold file is backed up, the new one written atomically and `data_update` published.\n`?dry_run=true` only checks. Requires `fits-manage`. An extension beyond the legacy API.",
+        "description": "Adds a fitting link to `fits.dat`, given as EFT text and/or DNA (both must describe the same\nfit). The fit goes after the last fit of `section` (a new section is appended), or after the\nlast fit. Names are unique. Everything else in `fits.dat` is left as it is. `implant_set`\nlinks the fit to an implant set (stored in that set's `fits` in `implants.yaml`, which is\nthen written too). Validated (with field paths; EFT problems carry their `line`), then the\nwhole data set must load; then the old files are backed up, the new ones written atomically\nand `data_update` published. `?dry_run=true` only checks. Requires `fits-manage`. An\nextension beyond the legacy API.",
         "operationId": "data_create_fit",
         "parameters": [
           {
@@ -4760,7 +4760,7 @@
           "data"
         ],
         "summary": "Update a doctrine fit",
-        "description": "Replaces the fit `name` (by `hull` too when several fits share the name): its link is\nrewritten in place, renamed when `name` differs, and moved when `section` names another\nsection. Skill plans and fit notes refer to fits by name and are not renamed with it (plans\nthat no longer build are reported as warnings). Saved like a create. Requires `fits-manage`.\nAn extension beyond the legacy API.",
+        "description": "Replaces the fit `name` (by `hull` too when several fits share the name): its link is\nrewritten in place, renamed when `name` differs, and moved when `section` names another\nsection. Without `implant_set` the fit keeps its implant set (the link follows a rename);\n`null` takes it out of its set, a name moves it to that set. Skill plans and fit notes refer\nto fits by name and are not renamed with it (plans that no longer build are reported as\nwarnings). Saved like a create. Requires `fits-manage`. An extension beyond the legacy API.",
         "operationId": "data_update_fit",
         "parameters": [
           {
@@ -4877,7 +4877,7 @@
           "data"
         ],
         "summary": "Delete a doctrine fit",
-        "description": "Removes the fit's link from `fits.dat` (backing up the old file). Requires `fits-manage`.\nAn extension beyond the legacy API.",
+        "description": "Removes the fit's link from `fits.dat` (backing up the old file), and its name from its\nimplant set when no other fit has that name. Requires `fits-manage`. An extension beyond the\nlegacy API.",
         "operationId": "data_delete_fit",
         "parameters": [
           {
@@ -4976,7 +4976,7 @@
           "data"
         ],
         "summary": "List implant sets",
-        "description": "The implant guide (`implants.yaml`): every set with its slots and their default and\nalternative implants. Requires `fits-manage`. An extension beyond the legacy API.",
+        "description": "The implant guide (`implants.yaml`): every set with its slots and their default and\nalternative implants, and the doctrine fits that use it (`fits`). Requires `fits-manage`.\nAn extension beyond the legacy API.",
         "operationId": "data_list_implant_sets",
         "responses": {
           "200": {
@@ -5023,7 +5023,7 @@
           "data"
         ],
         "summary": "Create an implant set",
-        "description": "Appends a set to the implant guide. Set names are unique; slots are 1 to 10, each at most\nonce; entry names are display text (an exact type name that is not an implant is a warning);\n`note` and `group` are single lines. `implants.yaml` is re-serialized (its leading comment\nblock is kept), backed up and written atomically; `data_update` is published.\n`?dry_run=true` only checks. Requires `fits-manage`. An extension beyond the legacy API.",
+        "description": "Appends a set to the implant guide. Set names are unique; slots are 1 to 10, each at most\nonce; entry names are display text (an exact type name that is not an implant is a warning);\n`note` and `group` are single lines. `fits` names the doctrine fits that use the set: a fit\nis in at most one set (one listed by another set is an error at `fits[i]`; a name that is no\ndoctrine fit is a warning). `implants.yaml` is re-serialized (its leading comment\nblock is kept), backed up and written atomically; `data_update` is published.\n`?dry_run=true` only checks. Requires `fits-manage`. An extension beyond the legacy API.",
         "operationId": "data_create_implant_set",
         "parameters": [
           {
@@ -6218,7 +6218,7 @@
           "doctrine"
         ],
         "summary": "Doctrine fittings",
-        "description": "Everything the public fittings page shows: the doctrine fits as ship DNA (fits whose name\ncontains the hidden-fit marker of `rules.yaml`, `ALTERNATIVE` by default, are left out), the\nfit notes (`fitnotes.yaml`), the implant guide (`implants.yaml`), and in `rules` the type ids\nthat put a fit in the configured category (logistics by default). Every field is always\npresent. No login needed.",
+        "description": "Everything the public fittings page shows: the doctrine fits as ship DNA (fits whose name\ncontains the hidden-fit marker of `rules.yaml`, `ALTERNATIVE` by default, are left out), the\nfit notes (`fitnotes.yaml`), the implant guide (`implants.yaml`), and in `rules` the type ids\nthat put a fit in the configured category (logistics by default). Every field is always\npresent. Extensions: a fit with an implant set has `implant_set` (the set's name; left out\notherwise), and a set lists its fits in `fits` (left out when empty). No login needed.",
         "operationId": "list_fittings",
         "responses": {
           "200": {
@@ -10508,7 +10508,7 @@
           "wiki"
         ],
         "summary": "Wiki images",
-        "description": "Every uploaded image, newest first. Requires `wiki-edit`. An extension beyond the legacy\nAPI.",
+        "description": "Every uploaded image, newest first, each with `used_by`: the live pages (that the viewer\nmay see) whose current body shows it. Requires `wiki-edit`. An extension beyond the legacy\nAPI.",
         "operationId": "wiki_assets",
         "responses": {
           "200": {
@@ -10657,7 +10657,7 @@
           "wiki"
         ],
         "summary": "Delete a wiki image",
-        "description": "Deletes an uploaded image; pages that show it get a broken image. Requires `wiki-edit`.\nAn extension beyond the legacy API.",
+        "description": "Deletes an uploaded image. An image that live pages still show (their current body\nreferences its URL) is not deleted: `409 conflict` with `used_by`, the pages the viewer may\nsee (the message counts every page). `?force=true` deletes it anyway; those pages then show\na broken image. Requires `wiki-edit`. An extension beyond the legacy API.",
         "operationId": "wiki_delete_asset",
         "parameters": [
           {
@@ -10668,6 +10668,15 @@
             "schema": {
               "type": "integer",
               "format": "int64"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "description": "`true`: delete the image even when pages show it (they get a broken image).",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -10694,6 +10703,16 @@
           },
           "404": {
             "description": "`not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`conflict`: pages show the image (see `used_by`); pass `force=true` to delete it anyway.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13602,6 +13621,13 @@
             "type": "string",
             "description": "The fit in EVE ship DNA format (`hull:module;count:...::`)."
           },
+          "implant_set": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the implant set (in `implants`) the fit uses; left out when it has none."
+          },
           "name": {
             "type": "string",
             "description": "Fit name, as in `fits.dat`."
@@ -13647,6 +13673,13 @@
               "null"
             ],
             "description": "The fit as EFT text. The header's fit name is ignored (`name` applies)."
+          },
+          "implant_set": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The implant set the fit uses (stored in the set's `fits` in `implants.yaml`, by fit\nname). Absent: a new fit gets none and an updated one keeps its set (following a rename);\n`null` takes the fit out of its set; a set name moves it to that set."
           },
           "name": {
             "type": "string",
@@ -13708,6 +13741,13 @@
           },
           "hull": {
             "$ref": "#/components/schemas/TypeRef"
+          },
+          "implant_set": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The implant set (`implants.yaml`) the fit uses, by name; `null` when none lists it."
           },
           "layout": {
             "$ref": "#/components/schemas/FitLayout"
@@ -15446,6 +15486,13 @@
           "slots"
         ],
         "properties": {
+          "fits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The doctrine fits (by name, as in `fits.dat`) that use this set. A fit is in at most one\nset. Optional in `implants.yaml` (left out when empty); older servers ignore it."
+          },
           "name": {
             "type": "string"
           },
@@ -16134,7 +16181,8 @@
         "required": [
           "valid",
           "errors",
-          "warnings"
+          "warnings",
+          "warning_details"
         ],
         "properties": {
           "errors": {
@@ -16159,12 +16207,19 @@
             "type": "boolean",
             "description": "Whether the text is one valid fit."
           },
+          "warning_details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "description": "The same warnings structured, like `errors` (path `eft`, with the `line`)."
+          },
           "warnings": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "E.g. loaded charges that were ignored, items that go in no slot, unpublished items."
+            "description": "E.g. loaded charges that were ignored, items that go in no slot, unpublished items, as\ntext (`line N: …`). Kept for older clients; see `warning_details`."
           }
         }
       },
@@ -18145,7 +18200,8 @@
           "valid",
           "dry_run",
           "errors",
-          "warnings"
+          "warnings",
+          "warning_details"
         ],
         "properties": {
           "dry_run": {
@@ -18163,12 +18219,19 @@
             "type": "boolean",
             "description": "Whether the request is valid (and, unless a dry run, was saved)."
           },
+          "warning_details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "description": "The same warnings, in the same order, like `errors`: the field `path` (empty for the\ndata set as a whole), the `message` without the prefix, and the `line` in EFT text."
+          },
           "warnings": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Problems that do not prevent saving, e.g. skill plans that no longer build or rules that\nname a category that does not exist."
+            "description": "Problems that do not prevent saving, e.g. skill plans that no longer build or rules that\nname a category that does not exist, as text (`line N: …` or `path: …` when they have\none). Kept for older clients; `warning_details` has the same warnings structured."
           }
         }
       },
@@ -18610,7 +18673,8 @@
           "url",
           "content_type",
           "size",
-          "uploaded_at"
+          "uploaded_at",
+          "used_by"
         ],
         "properties": {
           "content_type": {
@@ -18645,6 +18709,13 @@
           "url": {
             "type": "string",
             "description": "Where to load it: `/api/wiki/assets/{id}/{filename}`. Use this in Markdown images."
+          },
+          "used_by": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WikiPageLink"
+            },
+            "description": "Live pages whose current body shows the image (references its URL), by title; only\npages the viewer may see. Old revisions and deleted pages are not counted."
           }
         }
       },
@@ -18756,6 +18827,8 @@
           "from_title",
           "to_title",
           "summary_changed",
+          "from_summary",
+          "to_summary",
           "insertions",
           "deletions",
           "unified",
@@ -18769,6 +18842,17 @@
           "from": {
             "type": "integer",
             "format": "int64"
+          },
+          "from_for": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`for` (who the page is for) of each side; `null` when unset."
+          },
+          "from_summary": {
+            "type": "string",
+            "description": "Summary of each side."
           },
           "from_title": {
             "type": "string",
@@ -18786,11 +18870,21 @@
             "description": "Every line of both bodies, in order."
           },
           "summary_changed": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether the summary or `for` differ between the two sides."
           },
           "to": {
             "type": "integer",
             "format": "int64"
+          },
+          "to_for": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to_summary": {
+            "type": "string"
           },
           "to_title": {
             "type": "string"
@@ -18867,6 +18961,16 @@
               "$ref": "#/components/schemas/WikiProblem"
             },
             "description": "`invalid_markdown`: every problem in the body."
+          },
+          "used_by": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/WikiPageLink"
+            },
+            "description": "`conflict` deleting an image that pages still show: those pages."
           }
         }
       },

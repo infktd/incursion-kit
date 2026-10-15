@@ -5,6 +5,9 @@
 #   name:  (required) implant type name — clickable to copy
 #   note:  (optional) bonus text shown after the name
 #   group: (optional) bold label above the implant (e.g. hull name)
+#
+# A set may also list the doctrine fits that use it, by their name in fits.dat:
+#   fits: [ARMOR_VINDI, ARMOR_PALADIN]   (optional; a fit is in at most one set)
 
 sets:
   - name: Implants

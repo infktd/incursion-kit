@@ -87,12 +87,13 @@ impl ApiError {
     }
 
     /// A structured edit with these errors.
-    pub fn invalid(dry_run: bool, errors: Vec<FieldError>, warnings: Vec<String>) -> Self {
+    pub fn invalid(dry_run: bool, errors: Vec<FieldError>, warnings: Vec<FieldError>) -> Self {
         Self::Invalid(Box::new(ValidationReport {
             valid: false,
             dry_run,
             errors,
-            warnings,
+            warnings: warnings.iter().map(FieldError::text).collect(),
+            warning_details: warnings,
         }))
     }
 
@@ -163,18 +164,23 @@ pub struct ValidationReport {
     /// What is wrong, field by field (empty when valid).
     pub errors: Vec<FieldError>,
     /// Problems that do not prevent saving, e.g. skill plans that no longer build or rules that
-    /// name a category that does not exist.
+    /// name a category that does not exist, as text (`line N: …` or `path: …` when they have
+    /// one). Kept for older clients; `warning_details` has the same warnings structured.
     pub warnings: Vec<String>,
+    /// The same warnings, in the same order, like `errors`: the field `path` (empty for the
+    /// data set as a whole), the `message` without the prefix, and the `line` in EFT text.
+    pub warning_details: Vec<FieldError>,
 }
 
 impl ValidationReport {
     /// A valid request.
-    pub fn valid(dry_run: bool, warnings: Vec<String>) -> Self {
+    pub fn valid(dry_run: bool, warnings: Vec<FieldError>) -> Self {
         Self {
             valid: true,
             dry_run,
             errors: Vec::new(),
-            warnings,
+            warnings: warnings.iter().map(FieldError::text).collect(),
+            warning_details: warnings,
         }
     }
 

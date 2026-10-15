@@ -246,7 +246,7 @@ customises. Its layout is the original waitlist's, so an existing directory work
 | `skills.yaml` | Skill categories and per-hull skill tiers (`min`, `elite`, …). Name shared skill groups (YAML anchors merged into hulls) with a leading `_`, e.g. `_armor`: `GET /api/skills` lists them as groups, not hulls. |
 | `skillplan.yaml` | Skill plans. |
 | `modules.yaml` | Module alternatives, downgrades and fit-check exceptions. |
-| `implants.yaml` | The implant guide. |
+| `implants.yaml` | The implant guide. A set may list the doctrine fits that use it (`fits: [ARMOR_VINDI, …]`, by fit name; optional). |
 | `tags.yaml` | Tags every pilot may see. |
 | `rules.yaml` | Optional community rules (below). |
 | `locales/` | UI translations: `<page>.<locale>.json` and `languages.json`. |

@@ -1,8 +1,9 @@
 //! Doctrine fittings and notes.
 //!
-//! - `GET /api/fittings` (public): `{fittingdata: [{name, dna}], notes, implants, rules}`: the
-//!   doctrine fits (without hidden alternatives), fit notes, the implant guide and the type ids
-//!   that put a fit in the logistics category.
+//! - `GET /api/fittings` (public): `{fittingdata: [{name, dna, implant_set?}], notes, implants,
+//!   rules}`: the doctrine fits (without hidden alternatives), fit notes, the implant guide and
+//!   the type ids that put a fit in the logistics category. `implant_set` (an extension) names
+//!   the fit's set in `implants` and is left out when it has none.
 
 use axum::Json;
 use axum::extract::State;
@@ -23,7 +24,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
 /// contains the hidden-fit marker of `rules.yaml`, `ALTERNATIVE` by default, are left out), the
 /// fit notes (`fitnotes.yaml`), the implant guide (`implants.yaml`), and in `rules` the type ids
 /// that put a fit in the configured category (logistics by default). Every field is always
-/// present. No login needed.
+/// present. Extensions: a fit with an implant set has `implant_set` (the set's name; left out
+/// otherwise), and a set lists its fits in `fits` (left out when empty). No login needed.
 #[utoipa::path(
     get,
     path = "/api/fittings",

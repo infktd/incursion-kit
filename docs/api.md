@@ -146,7 +146,7 @@ the wiki's JSON errors described in [wiki.md](wiki.md#api)) with one of these st
 | Status | Body | When |
 |---|---|---|
 | 400 | a message | invalid input (`type error: …`, `fit error: …`, …), or a failed check |
-| 400 | JSON `{"valid": false, "dry_run", "errors": [{"path", "message"}], "warnings"}` | the structured data editors (`/api/data/*`) only: invalid data, field by field |
+| 400 | JSON `{"valid": false, "dry_run", "errors": [{"path", "message"}], "warnings", "warning_details"}` | the structured data editors (`/api/data/*`) only: invalid data, field by field |
 | 401 | `401 Authorization Required` | no valid session on an endpoint that needs one |
 | 401 | `access denied` | missing permission key, or the character isn't yours |
 | 401 | `ESI error: missing ESI scope` / `ESI error: no ESI token found` | the character must log in again (with the needed scopes) |
@@ -281,10 +281,10 @@ admin-only.
 
 | Resource | Endpoints |
 |---|---|
-| Doctrine fits (`fits.dat`) | `GET/POST /api/data/fits`, `GET/PUT/DELETE /api/data/fits/{name}` (`?hull=<type id>` when several fits share a name). Input `{name, eft?, dna?, section?}`; output adds the hull, normalised DNA and EFT, items by slot (`layout`), the `fits.dat` section, `hidden` and the category. |
-| EFT parsing | `POST /api/data/fits/parse` `{eft}`: `{valid, fit: {name, hull, dna, eft, layout, category, same_as}, errors, warnings}`; nothing is saved. |
+| Doctrine fits (`fits.dat`) | `GET/POST /api/data/fits`, `GET/PUT/DELETE /api/data/fits/{name}` (`?hull=<type id>` when several fits share a name). Input `{name, eft?, dna?, section?, implant_set?}`; output adds the hull, normalised DNA and EFT, items by slot (`layout`), the `fits.dat` section, `hidden`, the category and `implant_set` (the set's name, `null` for none). |
+| EFT parsing | `POST /api/data/fits/parse` `{eft}`: `{valid, fit: {name, hull, dna, eft, layout, category, same_as}, errors, warnings, warning_details}`; nothing is saved. |
 | Fit notes (`fitnotes.yaml`) | `GET/POST /api/data/fit-notes`, `GET/PUT/DELETE /api/data/fit-notes/{name}`: `{name, description}` (output adds `target`: `fit` or `tier`). |
-| Implant sets (`implants.yaml`) | `GET/POST /api/data/implant-sets`, `GET/PUT/DELETE /api/data/implant-sets/{name}`: `{name, slots: [{slot, default: [{name, note?, group?}], alternative}]}`. |
+| Implant sets (`implants.yaml`) | `GET/POST /api/data/implant-sets`, `GET/PUT/DELETE /api/data/implant-sets/{name}`: `{name, slots: [{slot, default: [{name, note?, group?}], alternative}], fits?}`; `fits` names the doctrine fits that use the set (left out when empty). |
 | Categories (`categories.yaml`) | `GET/PUT /api/data/categories`: `{categories: [{id, name}], rules: [{item, category}]}`. |
 | Tags (`tags.yaml`) | `GET/PUT /api/data/tags`: `{public_tags}`. |
 | Rules (`rules.yaml`) | `GET /api/data/rules`: `{custom, rules: {fit_check, fittings, war, skill_plans, fleet}}`; `PUT` the `rules` object. |
@@ -295,13 +295,17 @@ admin-only.
   check and writes nothing. A write checks the request, then loads the whole data set with the
   new file; only then is the old file backed up (`<file>.backup.<unix time>`), the new one
   written atomically, the data set swapped in and `data_update` published. The answer is a
-  `ValidationReport`: `{"valid": true, "dry_run", "errors": [], "warnings": [...]}` with `200`,
-  or the same shape with `"valid": false` and `400`. Each error is `{"path", "message"}` (plus
-  `line` inside EFT text); `path` points into the request (`name`, `slots[2].default[0].name`,
-  `rules[3].item`), and is empty for problems of the resulting data set. Warnings do not stop
-  a save (a skill plan that no longer builds, a category `rules.yaml` names but that does not
-  exist). These are the only JSON error bodies outside the wiki; `401`, `404` (`Fit not found`, …)
-  and `422` stay plain text.
+  `ValidationReport`: `{"valid": true, "dry_run", "errors": [], "warnings": [...],
+  "warning_details": [...]}` with `200`, or the same shape with `"valid": false` and `400`.
+  Each error is `{"path", "message"}` (plus `line` inside EFT text); `path` points into the
+  request (`name`, `slots[2].default[0].name`, `rules[3].item`), and is empty for problems of
+  the resulting data set. Warnings do not stop a save (a skill plan that no longer builds, a
+  category `rules.yaml` names but that does not exist, a charge loaded in EFT text).
+  `warnings` has them as text (`line 7: …`, `rules[1].item: …`); `warning_details` has the
+  same warnings in the same order structured like errors (`{"path", "message", "line"?}`,
+  the message without the prefix). The EFT parser's answer has both lists too. These are the
+  only JSON error bodies outside the wiki; `401`, `404` (`Fit not found`, …) and `422` stay
+  plain text.
 - **Formatting.** `fits.dat` is edited in place: only the changed link is rewritten, inserted
   or removed. YAML files are re-serialized from the typed data: the leading comment block is
   kept, other comments (and YAML anchors and merge keys) are lost, keys keep the file format's
@@ -310,6 +314,17 @@ admin-only.
 - **Names are identifiers.** Fits, notes, implant sets and skill plans are addressed by name,
   so renaming a fit does not rename the fit notes and skill plans that refer to it; plans that
   no longer build come back as warnings.
+- **Implant sets of fits.** Which implant set a doctrine fit uses is stored in the set: its
+  `fits` list in `implants.yaml` (fit names; a fit is in at most one set; older servers ignore
+  the key). It can be edited from either side. The implant set endpoints take `fits` (a fit
+  another set lists is an error at `fits[i]`, a name that is no doctrine fit a warning). The
+  fit endpoints take `implant_set`: on update, absent keeps the fit's set (also across a
+  rename), `null` takes the fit out, a name moves it there (an unknown set is an error at
+  `implant_set`); such a write changes `fits.dat` and `implants.yaml` together, each backed up
+  and published as its own `data_update`. Deleting a fit (or renaming it) takes its old name
+  out of its set when no fit has that name any more. `GET /api/fittings` has `implant_set` on
+  each fit that has one (an extension; the key is left out otherwise, so the legacy shape is
+  unchanged), and `fits` on the sets that list fits.
 
 **Wiki.** An in-app wiki under `/api/wiki*`: sections and a numbered index, pages in Markdown
 with directive components (`:::callout`, `::::steps`/`:::step`, `:::details`, `::fit{name=…}`),

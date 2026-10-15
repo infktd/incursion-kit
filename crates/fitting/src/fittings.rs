@@ -1,7 +1,7 @@
 //! The public fittings page: doctrine fits as DNA, `fitnotes.yaml`, `implants.yaml`, and
 //! `tags.yaml` (tags every pilot may see).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use wl_eve_data::{EveData, TypeId};
@@ -53,6 +53,48 @@ pub struct ImplantSlot {
 pub struct ImplantSet {
     pub name: String,
     pub slots: Vec<ImplantSlot>,
+    /// The doctrine fits (by name, as in `fits.dat`) that use this set. A fit is in at most one
+    /// set. Optional in `implants.yaml` (left out when empty); older servers ignore it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fits: Vec<String>,
+}
+
+/// The implant set of each doctrine fit name: the first set that lists the fit.
+pub(crate) fn implant_set_by_fit(implants: &[ImplantSet]) -> BTreeMap<&str, &str> {
+    let mut by_fit = BTreeMap::new();
+    for set in implants {
+        for fit in &set.fits {
+            by_fit.entry(fit.as_str()).or_insert(set.name.as_str());
+        }
+    }
+    by_fit
+}
+
+/// Problems with the fit links of `implants.yaml` that do not stop loading: a fit listed by
+/// several sets, or a name that is no doctrine fit.
+pub(crate) fn check_implant_links(implants: &[ImplantSet], fits: &DoctrineFits) -> Vec<String> {
+    let names: BTreeSet<&str> = fits.iter().map(|fit| fit.name.as_str()).collect();
+    let mut warnings = Vec::new();
+    let mut seen: BTreeMap<&str, &str> = BTreeMap::new();
+    for set in implants {
+        for fit in &set.fits {
+            let first = *seen.entry(fit.as_str()).or_insert(set.name.as_str());
+            if first != set.name {
+                warnings.push(format!(
+                    "implants.yaml: the fit {fit:?} is listed by the sets {first:?} and {:?}; \
+                     {first:?} applies",
+                    set.name
+                ));
+            }
+            if !names.contains(fit.as_str()) {
+                warnings.push(format!(
+                    "implants.yaml: the set {:?} lists {fit:?}, which is not a doctrine fit",
+                    set.name
+                ));
+            }
+        }
+    }
+    warnings
 }
 
 #[derive(Deserialize)]
@@ -87,6 +129,9 @@ pub struct DnaFitting {
     pub name: String,
     /// The fit in EVE ship DNA format (`hull:module;count:...::`).
     pub dna: String,
+    /// The name of the implant set (in `implants`) the fit uses; left out when it has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub implant_set: Option<String>,
 }
 
 /// `GET /api/fittings`. Every field is always present; they are optional only on the wire.
@@ -111,6 +156,7 @@ pub(crate) fn fittings_response(
     implants: &[ImplantSet],
     rules: &FittingsRules,
 ) -> Result<FittingsResponse, FitError> {
+    let sets = implant_set_by_fit(implants);
     let fittingdata = fits
         .iter()
         .filter(|fit| !fit.name.contains(&rules.hidden_fit_marker))
@@ -118,6 +164,7 @@ pub(crate) fn fittings_response(
             Ok(DnaFitting {
                 name: fit.name.clone(),
                 dna: fit.fit.to_dna(eve)?,
+                implant_set: sets.get(fit.name.as_str()).map(|set| set.to_string()),
             })
         })
         .collect::<Result<_, FitError>>()?;

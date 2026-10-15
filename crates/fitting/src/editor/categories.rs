@@ -65,10 +65,13 @@ fn check(document: &CategoriesDocument, eve: &EveData) -> Problems {
         if resolve(eve, &mut problems, &format!("{path}.item"), &rule.item).is_some()
             && !items.insert(rule.item.as_str())
         {
-            problems.warn(format!(
-                "{path}.item: {:?} has an earlier rule, so this one never applies",
-                rule.item
-            ));
+            problems.warn(
+                format!("{path}.item"),
+                format!(
+                    "{:?} has an earlier rule, so this one never applies",
+                    rule.item
+                ),
+            );
         }
         if !ids.contains(rule.category.as_str()) {
             problems.error(

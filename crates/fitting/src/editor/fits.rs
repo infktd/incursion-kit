@@ -6,15 +6,15 @@
 //! links (tags stripped) names the section the following fits are in (`LOGI`, `MARAUDERS`, …).
 //! Edits replace, insert or remove single links and leave everything else untouched.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 use wl_eve_data::{Category, EveData, Slot, TypeId};
 
-use super::{Edited, Problems, Rejection, TypeRef, check_name};
+use super::{Edited, FieldError, Problems, Rejection, TypeRef, check_name, implants};
 use crate::doctrine::FIT_LINK;
-use crate::{DataSet, FitError, Fitting};
+use crate::{DataFile, DataSet, DataSources, FitError, Fitting};
 
 /// EFT sections before the cargo hold: everything from the eighth section on is cargo (see
 /// [`Fitting::from_eft`]).
@@ -316,22 +316,28 @@ pub fn parse_eft(text: &str, eve: &EveData, path: &str) -> EftParse {
                 problems.line_error(path, number, format!("unknown charge {charge:?}"));
                 continue;
             }
-            problems.warn(format!(
-                "line {number}: the loaded charge {charge:?} is ignored; put charges in the cargo"
-            ));
+            problems.line_warn(
+                path,
+                number,
+                format!("the loaded charge {charge:?} is ignored; put charges in the cargo"),
+            );
         }
         if !ty.published {
-            problems.warn(format!(
-                "line {number}: {item_name:?} is not published in game"
-            ));
+            problems.line_warn(
+                path,
+                number,
+                format!("{item_name:?} is not published in game"),
+            );
         }
         let is_cargo = section >= EFT_CARGO_SECTION
             || ty.is_always_cargo()
             || (stacked && ty.category != Category::Drone);
         if !is_cargo && ty.slot().is_none() && ty.category != Category::Other(SUBSYSTEM_CATEGORY) {
-            problems.warn(format!(
-                "line {number}: {item_name:?} does not go in a slot but is listed as fitted"
-            ));
+            problems.line_warn(
+                path,
+                number,
+                format!("{item_name:?} does not go in a slot but is listed as fitted"),
+            );
         }
         let target = if is_cargo { &mut cargo } else { &mut modules };
         let entry = target.entry(ty.id).or_insert(0);
@@ -393,6 +399,8 @@ pub struct DoctrineFitView {
     pub category: String,
     /// Index of the fit in `fits.dat` (file order).
     pub position: usize,
+    /// The implant set (`implants.yaml`) the fit uses, by name; `null` when none lists it.
+    pub implant_set: Option<String>,
 }
 
 /// Every doctrine fit of `content` (`fits.dat`), in file order.
@@ -412,6 +420,7 @@ pub fn doctrine_fits(content: &str, data: &DataSet) -> Vec<DoctrineFitView> {
                 hidden: link.name.contains(&data.rules.fittings.hidden_fit_marker),
                 category: data.categorize(&fit).to_string(),
                 position,
+                implant_set: data.implant_set_of(&link.name).map(str::to_string),
                 name: link.name,
             })
         })
@@ -435,6 +444,12 @@ pub struct DoctrineFitInput {
     /// stays where it is.
     #[serde(default)]
     pub section: Option<String>,
+    /// The implant set the fit uses (stored in the set's `fits` in `implants.yaml`, by fit
+    /// name). Absent: a new fit gets none and an updated one keeps its set (following a rename);
+    /// `null` takes the fit out of its set; a set name moves it to that set.
+    #[serde(default, deserialize_with = "super::double_option")]
+    #[schema(value_type = Option<String>)]
+    pub implant_set: Option<Option<String>>,
 }
 
 /// Checks the request and resolves the fit.
@@ -605,6 +620,101 @@ pub fn delete_fit(content: &str, selector: &FitSelector) -> Edited {
     let all = links(content);
     let index = find(&all, selector)?;
     Problems::default().finish(remove(content, &all[index]))
+}
+
+/// A doctrine fit write through [`write_fit`].
+#[derive(Debug, Clone, Copy)]
+pub enum FitWrite<'a> {
+    Create(&'a DoctrineFitInput),
+    Update(&'a FitSelector, &'a DoctrineFitInput),
+    Delete(&'a FitSelector),
+}
+
+/// A doctrine fit write with its implant set link: edits `fits.dat` (as [`create_fit`],
+/// [`update_fit`] and [`delete_fit`] do) and, when the fit's set changes, the `fits` lists of
+/// `implants.yaml`, in `sources` (for [`crate::DataStore::edit_files`]). Links are by fit name:
+/// a renamed fit keeps its set unless `implant_set` says otherwise, and a name no fit has any
+/// more (deleted, renamed) leaves its set. Answers the warnings.
+pub fn write_fit(
+    sources: &mut DataSources,
+    data: &DataSet,
+    write: FitWrite<'_>,
+) -> Result<Vec<FieldError>, Rejection> {
+    let file = |sources: &DataSources, file: DataFile| {
+        sources
+            .get(file)
+            .map(str::to_string)
+            .map_err(|error| Rejection::invalid("", error.to_string()))
+    };
+    let fits = file(sources, DataFile::Fits)?;
+    let implants = file(sources, DataFile::Implants)?;
+    let sets = implants::current(&implants)?;
+
+    let (old_name, input) = match write {
+        FitWrite::Create(input) => (None, Some(input)),
+        FitWrite::Update(selector, input) => (Some(selector.name.as_str()), Some(input)),
+        FitWrite::Delete(selector) => (Some(selector.name.as_str()), None),
+    };
+    let mut set_problems = Problems::default();
+    if let Some(Some(Some(name))) = input.map(|input| &input.implant_set)
+        && !sets.iter().any(|set| &set.name == name)
+    {
+        set_problems.error("implant_set", format!("no implant set is named {name:?}"));
+    }
+
+    let edited = match write {
+        FitWrite::Create(input) => create_fit(&fits, data, input),
+        FitWrite::Update(selector, input) => update_fit(&fits, data, selector, input),
+        FitWrite::Delete(selector) => delete_fit(&fits, selector),
+    };
+    let (new_fits, mut warnings) = match edited {
+        Err(Rejection::Invalid(mut problems)) => {
+            problems.errors.extend(set_problems.errors);
+            return Err(problems.into());
+        }
+        Err(rejection) => return Err(rejection),
+        Ok(_) if set_problems.has_errors() => return Err(set_problems.into()),
+        Ok(edited) => edited,
+    };
+
+    // Where the (new) name goes: the requested set, the set of the fit before an update, or
+    // nowhere new for a create without a set.
+    let old_set = old_name.and_then(|old| {
+        sets.iter()
+            .find(|set| set.fits.iter().any(|fit| fit == old))
+            .map(|set| set.name.clone())
+    });
+    let target = match (write, input.map(|input| &input.implant_set)) {
+        (_, Some(Some(requested))) => Some(requested.clone()),
+        (FitWrite::Update(..), _) => Some(old_set),
+        _ => None,
+    };
+    let remaining: BTreeSet<String> = links(&new_fits).into_iter().map(|l| l.name).collect();
+    let mut new_sets = sets.clone();
+    if let (Some(target), Some(input)) = (target, input) {
+        for set in &mut new_sets {
+            let listed = set.fits.contains(&input.name);
+            if target.as_deref() == Some(set.name.as_str()) {
+                if !listed {
+                    set.fits.push(input.name.clone());
+                }
+            } else if listed {
+                set.fits.retain(|fit| *fit != input.name);
+            }
+        }
+    }
+    if let Some(old) = old_name.filter(|old| !remaining.contains(*old)) {
+        for set in &mut new_sets {
+            set.fits.retain(|fit| fit != old);
+        }
+    }
+    if new_sets != sets {
+        let (content, set_warnings) = implants::save(&implants, &new_sets, Problems::default())?;
+        warnings.extend(set_warnings);
+        sources.set(DataFile::Implants, content);
+    }
+    sources.set(DataFile::Fits, new_fits);
+    Ok(warnings)
 }
 
 #[cfg(test)]

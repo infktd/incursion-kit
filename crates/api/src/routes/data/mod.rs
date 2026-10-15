@@ -26,8 +26,8 @@ use axum::Json;
 use serde::Deserialize;
 use utoipa::IntoParams;
 use utoipa_axum::router::OpenApiRouter;
-use wl_fitting::editor::{Edited, Rejection, data_error_fields};
-use wl_fitting::{DataError, DataFile, DataSet, EditError};
+use wl_fitting::editor::{Edited, FieldError, Rejection, data_error_fields};
+use wl_fitting::{DataError, DataFile, DataSet, DataSources, EditError, Validation};
 
 use super::blocking;
 use crate::{ApiError, ApiResult, AppState, ValidationReport};
@@ -61,9 +61,36 @@ async fn edit(
     edit: impl FnOnce(&str, &DataSet) -> Edited + Send + 'static,
 ) -> ApiResult<Json<ValidationReport>> {
     let store = state.data_store()?.clone();
-    blocking(move || match store.edit(file, dry_run, edit) {
+    blocking(move || report(dry_run, store.edit(file, dry_run, edit))).await
+}
+
+/// Runs `edit` on several data files at once (see [`wl_fitting::DataStore::edit_files`]) and
+/// answers the outcome.
+async fn edit_files(
+    state: &AppState,
+    dry_run: bool,
+    edit: impl FnOnce(&mut DataSources, &DataSet) -> Result<Vec<FieldError>, Rejection> + Send + 'static,
+) -> ApiResult<Json<ValidationReport>> {
+    let store = state.data_store()?.clone();
+    blocking(move || {
+        report(
+            dry_run,
+            store.edit_files(dry_run, |sources, data| {
+                edit(sources, data).map_err(EditError::Edit)
+            }),
+        )
+    })
+    .await
+}
+
+/// The answer to a data edit.
+fn report(
+    dry_run: bool,
+    result: Result<(Validation, Vec<FieldError>), EditError<Rejection>>,
+) -> ApiResult<Json<ValidationReport>> {
+    match result {
         Ok((validation, mut warnings)) => {
-            warnings.extend(validation.warnings);
+            warnings.extend(validation.warnings.into_iter().map(FieldError::general));
             Ok(Json(ValidationReport::valid(dry_run, warnings)))
         }
         Err(EditError::Edit(Rejection::NotFound(message))) => Err(ApiError::not_found(message)),
@@ -80,8 +107,7 @@ async fn edit(
             data_error_fields(&error),
             Vec::new(),
         )),
-    })
-    .await
+    }
 }
 
 /// The current contents of `file` (the built-in default for an absent `rules.yaml`) with the

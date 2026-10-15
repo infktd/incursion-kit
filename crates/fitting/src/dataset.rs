@@ -57,6 +57,7 @@ impl DataSet {
         let mut warnings = Vec::new();
         warnings.extend(check_skill_sets(&rules, &skills));
         warnings.extend(check_categories(&rules, &categories));
+        warnings.extend(fittings::check_implant_links(&implants, &fits));
 
         let context = PlanContext {
             eve: &eve,
@@ -116,6 +117,14 @@ impl DataSet {
     /// How `actual` differs from the doctrine fit `expect`.
     pub fn diff(&self, expect: &Fitting, actual: &Fitting) -> DiffResult {
         diff(expect, actual, &self.modules)
+    }
+
+    /// The name of the implant set a doctrine fit uses (`fits` of `implants.yaml`), if any.
+    pub fn implant_set_of(&self, fit_name: &str) -> Option<&str> {
+        self.implants
+            .iter()
+            .find(|set| set.fits.iter().any(|fit| fit == fit_name))
+            .map(|set| set.name.as_str())
     }
 
     /// The category id of a fit, falling back to the default category.

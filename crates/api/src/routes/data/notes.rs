@@ -188,7 +188,8 @@ struct ImplantSetList {
 /// List implant sets
 ///
 /// The implant guide (`implants.yaml`): every set with its slots and their default and
-/// alternative implants. Requires `fits-manage`. An extension beyond the legacy API.
+/// alternative implants, and the doctrine fits that use it (`fits`). Requires `fits-manage`.
+/// An extension beyond the legacy API.
 #[utoipa::path(
     get,
     path = "/api/data/implant-sets",
@@ -243,7 +244,9 @@ async fn get_set(
 ///
 /// Appends a set to the implant guide. Set names are unique; slots are 1 to 10, each at most
 /// once; entry names are display text (an exact type name that is not an implant is a warning);
-/// `note` and `group` are single lines. `implants.yaml` is re-serialized (its leading comment
+/// `note` and `group` are single lines. `fits` names the doctrine fits that use the set: a fit
+/// is in at most one set (one listed by another set is an error at `fits[i]`; a name that is no
+/// doctrine fit is a warning). `implants.yaml` is re-serialized (its leading comment
 /// block is kept), backed up and written atomically; `data_update` is published.
 /// `?dry_run=true` only checks. Requires `fits-manage`. An extension beyond the legacy API.
 #[utoipa::path(
@@ -270,7 +273,7 @@ async fn create_set(
         &state,
         DataFile::Implants,
         query.dry_run,
-        move |content, data| editor::create_implant_set(content, data.eve(), &set),
+        move |content, data| editor::create_implant_set(content, data, &set),
     )
     .await
 }
@@ -305,7 +308,7 @@ async fn update_set(
         &state,
         DataFile::Implants,
         query.dry_run,
-        move |content, data| editor::update_implant_set(content, data.eve(), &name, &set),
+        move |content, data| editor::update_implant_set(content, data, &name, &set),
     )
     .await
 }

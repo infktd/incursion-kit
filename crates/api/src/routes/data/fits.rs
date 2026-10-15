@@ -9,10 +9,10 @@ use utoipa_axum::routes;
 use wl_eve_data::TypeId;
 use wl_fitting::DataFile;
 use wl_fitting::editor::{
-    self, DoctrineFitInput, DoctrineFitView, FieldError, FitLayout, FitSelector, TypeRef,
+    self, DoctrineFitInput, DoctrineFitView, FieldError, FitLayout, FitSelector, FitWrite, TypeRef,
 };
 
-use super::{FITS_MANAGE, WriteQuery, edit, read};
+use super::{FITS_MANAGE, WriteQuery, edit_files, read};
 use crate::extract::{Path, Query};
 use crate::openapi::tags;
 use crate::{ApiError, ApiResult, AppState, AuthenticatedAccount, JsonBody, ValidationReport};
@@ -54,8 +54,8 @@ impl FitQuery {
 ///
 /// Every doctrine fit of `fits.dat` in file order, hidden alternatives included: name, hull,
 /// normalised DNA, EFT text, items by slot, the `fits.dat` section it is listed under, whether
-/// the public list hides it, and the waitlist category it lands in. Requires `fits-manage`. An
-/// extension beyond the legacy API.
+/// the public list hides it, the waitlist category it lands in, and the implant set it uses.
+/// Requires `fits-manage`. An extension beyond the legacy API.
 #[utoipa::path(
     get,
     path = "/api/data/fits",
@@ -125,10 +125,12 @@ async fn get(
 ///
 /// Adds a fitting link to `fits.dat`, given as EFT text and/or DNA (both must describe the same
 /// fit). The fit goes after the last fit of `section` (a new section is appended), or after the
-/// last fit. Names are unique. Everything else in `fits.dat` is left as it is. Validated (with
-/// field paths; EFT problems carry their `line`), then the whole data set must load; then the
-/// old file is backed up, the new one written atomically and `data_update` published.
-/// `?dry_run=true` only checks. Requires `fits-manage`. An extension beyond the legacy API.
+/// last fit. Names are unique. Everything else in `fits.dat` is left as it is. `implant_set`
+/// links the fit to an implant set (stored in that set's `fits` in `implants.yaml`, which is
+/// then written too). Validated (with field paths; EFT problems carry their `line`), then the
+/// whole data set must load; then the old files are backed up, the new ones written atomically
+/// and `data_update` published. `?dry_run=true` only checks. Requires `fits-manage`. An
+/// extension beyond the legacy API.
 #[utoipa::path(
     post,
     path = "/api/data/fits",
@@ -149,12 +151,9 @@ async fn create(
     JsonBody(input): JsonBody<DoctrineFitInput>,
 ) -> ApiResult<Json<ValidationReport>> {
     account.require_access(FITS_MANAGE)?;
-    edit(
-        &state,
-        DataFile::Fits,
-        query.dry_run,
-        move |content, data| editor::create_fit(content, data, &input),
-    )
+    edit_files(&state, query.dry_run, move |sources, data| {
+        editor::write_fit(sources, data, FitWrite::Create(&input))
+    })
     .await
 }
 
@@ -162,9 +161,10 @@ async fn create(
 ///
 /// Replaces the fit `name` (by `hull` too when several fits share the name): its link is
 /// rewritten in place, renamed when `name` differs, and moved when `section` names another
-/// section. Skill plans and fit notes refer to fits by name and are not renamed with it (plans
-/// that no longer build are reported as warnings). Saved like a create. Requires `fits-manage`.
-/// An extension beyond the legacy API.
+/// section. Without `implant_set` the fit keeps its implant set (the link follows a rename);
+/// `null` takes it out of its set, a name moves it to that set. Skill plans and fit notes refer
+/// to fits by name and are not renamed with it (plans that no longer build are reported as
+/// warnings). Saved like a create. Requires `fits-manage`. An extension beyond the legacy API.
 #[utoipa::path(
     put,
     path = "/api/data/fits/{name}",
@@ -188,19 +188,17 @@ async fn update(
 ) -> ApiResult<Json<ValidationReport>> {
     account.require_access(FITS_MANAGE)?;
     let selector = query.selector(name);
-    edit(
-        &state,
-        DataFile::Fits,
-        query.dry_run,
-        move |content, data| editor::update_fit(content, data, &selector, &input),
-    )
+    edit_files(&state, query.dry_run, move |sources, data| {
+        editor::write_fit(sources, data, FitWrite::Update(&selector, &input))
+    })
     .await
 }
 
 /// Delete a doctrine fit
 ///
-/// Removes the fit's link from `fits.dat` (backing up the old file). Requires `fits-manage`.
-/// An extension beyond the legacy API.
+/// Removes the fit's link from `fits.dat` (backing up the old file), and its name from its
+/// implant set when no other fit has that name. Requires `fits-manage`. An extension beyond the
+/// legacy API.
 #[utoipa::path(
     delete,
     path = "/api/data/fits/{name}",
@@ -222,8 +220,8 @@ async fn delete(
 ) -> ApiResult<Json<ValidationReport>> {
     account.require_access(FITS_MANAGE)?;
     let selector = query.selector(name);
-    edit(&state, DataFile::Fits, query.dry_run, move |content, _| {
-        editor::delete_fit(content, &selector)
+    edit_files(&state, query.dry_run, move |sources, data| {
+        editor::write_fit(sources, data, FitWrite::Delete(&selector))
     })
     .await
 }
@@ -258,8 +256,11 @@ struct ParseResponse {
     fit: Option<ParsedFit>,
     /// Problems (path `eft`, with the `line`).
     errors: Vec<FieldError>,
-    /// E.g. loaded charges that were ignored, items that go in no slot, unpublished items.
+    /// E.g. loaded charges that were ignored, items that go in no slot, unpublished items, as
+    /// text (`line N: …`). Kept for older clients; see `warning_details`.
     warnings: Vec<String>,
+    /// The same warnings structured, like `errors` (path `eft`, with the `line`).
+    warning_details: Vec<FieldError>,
 }
 
 /// Parse a fit
@@ -314,6 +315,12 @@ async fn parse(
         valid: fit.is_some(),
         fit,
         errors: parsed.problems.errors,
-        warnings: parsed.problems.warnings,
+        warnings: parsed
+            .problems
+            .warnings
+            .iter()
+            .map(FieldError::text)
+            .collect(),
+        warning_details: parsed.problems.warnings,
     }))
 }

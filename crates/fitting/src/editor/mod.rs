@@ -25,8 +25,8 @@ mod types;
 
 pub use categories::{CategoriesDocument, CategoryRuleEntry};
 pub use fits::{
-    DoctrineFitInput, DoctrineFitView, EftParse, FitItem, FitLayout, FitSelector, create_fit,
-    delete_fit, doctrine_fits, parse_eft, render_eft, update_fit,
+    DoctrineFitInput, DoctrineFitView, EftParse, FitItem, FitLayout, FitSelector, FitWrite,
+    create_fit, delete_fit, doctrine_fits, parse_eft, render_eft, update_fit, write_fit,
 };
 pub use implants::{create_implant_set, delete_implant_set, update_implant_set};
 pub use notes::{FitNoteView, NoteTarget, create_note, delete_note, fit_notes, update_note};
@@ -53,12 +53,34 @@ pub struct FieldError {
     pub line: Option<usize>,
 }
 
+impl FieldError {
+    /// A problem that concerns no particular field (`path` empty), e.g. from loading the data
+    /// set.
+    pub fn general(message: impl Into<String>) -> Self {
+        Self {
+            path: String::new(),
+            message: message.into(),
+            line: None,
+        }
+    }
+
+    /// The problem as one line of text: `line N: message` for a problem with a line,
+    /// `path: message` for one with a path, else the message.
+    pub fn text(&self) -> String {
+        match (self.line, self.path.as_str()) {
+            (Some(line), _) => format!("line {line}: {}", self.message),
+            (None, "") => self.message.clone(),
+            (None, path) => format!("{path}: {}", self.message),
+        }
+    }
+}
+
 /// Errors and warnings collected while checking an edit.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Problems {
     pub errors: Vec<FieldError>,
-    /// Problems that do not prevent saving.
-    pub warnings: Vec<String>,
+    /// Problems that do not prevent saving, with their field path (and line in EFT text).
+    pub warnings: Vec<FieldError>,
 }
 
 impl Problems {
@@ -78,8 +100,20 @@ impl Problems {
         });
     }
 
-    pub fn warn(&mut self, message: impl Into<String>) {
-        self.warnings.push(message.into());
+    pub fn warn(&mut self, path: impl Into<String>, message: impl Into<String>) {
+        self.warnings.push(FieldError {
+            path: path.into(),
+            message: message.into(),
+            line: None,
+        });
+    }
+
+    pub fn line_warn(&mut self, path: &str, line: usize, message: impl Into<String>) {
+        self.warnings.push(FieldError {
+            path: path.to_string(),
+            message: message.into(),
+            line: Some(line),
+        });
     }
 
     pub fn has_errors(&self) -> bool {
@@ -87,7 +121,7 @@ impl Problems {
     }
 
     /// `value` with the warnings, or the problems when there are errors.
-    pub(crate) fn finish<T>(self, value: T) -> Result<(T, Vec<String>), Rejection> {
+    pub(crate) fn finish<T>(self, value: T) -> Result<(T, Vec<FieldError>), Rejection> {
         if self.has_errors() {
             Err(Rejection::Invalid(self))
         } else {
@@ -120,15 +154,11 @@ impl Rejection {
 }
 
 /// The result of an edit: the new file contents and warnings about the request.
-pub type Edited = Result<(String, Vec<String>), Rejection>;
+pub type Edited = Result<(String, Vec<FieldError>), Rejection>;
 
 /// The errors a data set that does not load reports, as field errors without a path.
 pub fn data_error_fields(error: &DataError) -> Vec<FieldError> {
-    let field = |message: String| FieldError {
-        path: String::new(),
-        message,
-        line: None,
-    };
+    let field = FieldError::general;
     match error {
         DataError::MissingTypes(missing) => missing
             .0
@@ -143,6 +173,15 @@ pub fn data_error_fields(error: &DataError) -> Vec<FieldError> {
             .collect(),
         other => vec![field(other.to_string())],
     }
+}
+
+/// `Some(None)` for an explicit `null`, `None` when the field is absent.
+fn double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 /// A type with its name.

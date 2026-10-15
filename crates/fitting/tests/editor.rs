@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 use common::{example_store, id, read};
 use pretty_assertions::assert_eq;
 use wl_fitting::editor::{
-    self, CategoriesDocument, CategoryRuleEntry, DoctrineFitInput, FitSelector, Rejection,
-    TagsDocument, TypeKind,
+    self, CategoriesDocument, CategoryRuleEntry, DoctrineFitInput, FieldError, FitSelector,
+    FitWrite, Rejection, TagsDocument, TypeKind,
 };
 use wl_fitting::{
     DEFAULT_RULES, DataFile, DataSet, DataStore, EditError, Fitting, FittingNote, ImplantEntry,
@@ -21,13 +21,13 @@ fn apply(
     store: &DataStore,
     file: DataFile,
     edit: impl FnOnce(&str, &DataSet) -> editor::Edited,
-) -> Result<Vec<String>, EditError<Rejection>> {
+) -> Result<Vec<FieldError>, EditError<Rejection>> {
     store
         .edit(file, false, edit)
-        .map(|(_, warnings): (_, Vec<String>)| warnings)
+        .map(|(_, warnings): (_, Vec<FieldError>)| warnings)
 }
 
-fn errors(result: Result<Vec<String>, EditError<Rejection>>) -> Vec<(String, String)> {
+fn errors(result: Result<Vec<FieldError>, EditError<Rejection>>) -> Vec<(String, String)> {
     match result {
         Err(EditError::Edit(Rejection::Invalid(problems))) => problems
             .errors
@@ -79,11 +79,18 @@ fn eft_problems_carry_lines() {
         .collect();
     assert_eq!(lines, [(Some(3), "unknown type \"No Such Module\"")]);
     assert!(parsed.fit.is_none());
-    assert!(
-        parsed.problems.warnings[0].contains("loaded charge"),
-        "{:?}",
-        parsed.problems.warnings
+    // Warnings are structured like errors: path, line, and the message without the line.
+    let warning = &parsed.problems.warnings[0];
+    assert_eq!(
+        (warning.path.as_str(), warning.line),
+        ("eft", Some(4)),
+        "{warning:?}"
     );
+    assert!(
+        warning.message.starts_with("the loaded charge"),
+        "{warning:?}"
+    );
+    assert!(warning.text().starts_with("line 4: the loaded charge"));
 
     let parsed = editor::parse_eft("[Rifter, x]\n[Rifter, y]\n", eve, "eft");
     assert_eq!(parsed.problems.errors[0].line, Some(2));
@@ -134,6 +141,7 @@ fn doctrine_fits_round_trip_through_fits_dat() {
         eft: Some(vindi.eft.replace("ARMOR_VINDI", "ignored")),
         dna: None,
         section: Some("LOGI".into()),
+        implant_set: None,
     };
     apply(&store, DataFile::Fits, |content, data| {
         editor::create_fit(content, data, &input)
@@ -171,6 +179,7 @@ fn doctrine_fits_round_trip_through_fits_dat() {
         eft: None,
         dna: Some(paladin.dna.clone()),
         section: Some("NEW SECTION".into()),
+        implant_set: None,
     };
     let selector = FitSelector {
         name: "TEST_VINDI".into(),
@@ -287,7 +296,7 @@ fn dry_runs_write_nothing() {
             editor::write_tags(content, &document)
         })
         .expect("valid");
-    assert_eq!(warnings, Vec::<String>::new());
+    assert_eq!(warnings, Vec::<FieldError>::new());
     assert_eq!(read(dir.path(), "tags.yaml"), before);
     assert_eq!(store.get().public_tags.len(), 6);
 }
@@ -368,9 +377,10 @@ fn notes_implants_tags_and_categories_round_trip() {
             }],
             alternative: vec![],
         }],
+        fits: vec![],
     };
     apply(&store, DataFile::Implants, |content, data| {
-        editor::create_implant_set(content, data.eve(), &set)
+        editor::create_implant_set(content, data, &set)
     })
     .expect("set created");
     let reopened = reopen(&store);
@@ -384,14 +394,19 @@ fn notes_implants_tags_and_categories_round_trip() {
     bad.slots[1].slot = 2;
     bad.slots[1].default[0].name = "Hobgoblin II".into();
     let mut problems = match store.edit(DataFile::Implants, true, |content, data| {
-        editor::create_implant_set(content, data.eve(), &bad)
+        editor::create_implant_set(content, data, &bad)
     }) {
         Err(EditError::Edit(Rejection::Invalid(problems))) => problems,
         other => panic!("{other:?}"),
     };
     let paths: Vec<String> = problems.errors.drain(..).map(|e| e.path).collect();
     assert_eq!(paths, ["slots[0].slot", "slots[0].default[0].name"]);
-    assert!(problems.warnings[0].starts_with("slots[1].default[0].name"));
+    assert_eq!(problems.warnings[0].path, "slots[1].default[0].name");
+    assert!(
+        problems.warnings[0]
+            .text()
+            .starts_with("slots[1].default[0].name: ")
+    );
     apply(&store, DataFile::Implants, |content, _| {
         editor::delete_implant_set(content, "Budget")
     })
@@ -648,5 +663,159 @@ fn the_listener_hears_every_change() {
     assert_eq!(
         *heard.lock().unwrap(),
         [Some(DataFile::Tags), Some(DataFile::Tags), None]
+    );
+}
+
+#[test]
+fn fits_link_to_implant_sets() {
+    let Some((dir, store)) = example_store() else {
+        return;
+    };
+    let heard = Arc::new(Mutex::new(Vec::new()));
+    let sink = heard.clone();
+    store.on_change(move |file| sink.lock().unwrap().push(file));
+    let write = |write: FitWrite<'_>| {
+        store
+            .edit_files(false, |sources, data| {
+                editor::write_fit(sources, data, write).map_err(EditError::Edit)
+            })
+            .map(|(_, warnings)| warnings)
+    };
+    let set_fits = |store: &DataStore| -> Vec<(String, Vec<String>)> {
+        store
+            .get()
+            .implants
+            .iter()
+            .map(|set| (set.name.clone(), set.fits.clone()))
+            .collect()
+    };
+    let base = store.get().implants[0].clone();
+    assert!(base.fits.is_empty());
+
+    // A set lists its fits; the fit views and `GET /api/fittings` name the set.
+    let budget = ImplantSet {
+        name: "Budget".into(),
+        fits: vec!["ARMOR_VINDI".into()],
+        ..base.clone()
+    };
+    apply(&store, DataFile::Implants, |content, data| {
+        editor::create_implant_set(content, data, &budget)
+    })
+    .expect("set created");
+    let data = reopen(&store).get();
+    assert_eq!(data.implant_set_of("ARMOR_VINDI"), Some("Budget"));
+    let fittings = data.fittings.fittingdata.as_ref().unwrap();
+    let vindi = fittings.iter().find(|f| f.name == "ARMOR_VINDI").unwrap();
+    assert_eq!(vindi.implant_set.as_deref(), Some("Budget"));
+    assert!(
+        fittings
+            .iter()
+            .filter(|f| f.name != "ARMOR_VINDI")
+            .all(|f| f.implant_set.is_none())
+    );
+    let views = editor::doctrine_fits(&read(dir.path(), "fits.dat"), &data);
+    let view = views.iter().find(|f| f.name == "ARMOR_VINDI").unwrap();
+    assert_eq!(view.implant_set.as_deref(), Some("Budget"));
+    let dna = view.dna.clone();
+
+    // A fit is in at most one set; unknown fits are a warning.
+    let other = ImplantSet {
+        name: "Other".into(),
+        fits: vec!["ARMOR_VINDI".into(), "NOPE".into(), "NOPE".into()],
+        ..base.clone()
+    };
+    let problems = match store.edit(DataFile::Implants, true, |content, data| {
+        editor::create_implant_set(content, data, &other)
+    }) {
+        Err(EditError::Edit(Rejection::Invalid(problems))) => problems,
+        other => panic!("{other:?}"),
+    };
+    let paths: Vec<&str> = problems.errors.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(paths, ["fits[0]", "fits[2]"]);
+    assert_eq!(problems.warnings[0].path, "fits[1]");
+
+    // Renaming a fit keeps its set; the fit write changes both files.
+    heard.lock().unwrap().clear();
+    let selector = |name: &str| FitSelector {
+        name: name.into(),
+        hull: None,
+    };
+    let renamed = DoctrineFitInput {
+        name: "VINDI_2".into(),
+        dna: Some(dna.clone()),
+        ..Default::default()
+    };
+    write(FitWrite::Update(&selector("ARMOR_VINDI"), &renamed)).expect("renamed");
+    assert_eq!(
+        set_fits(&reopen(&store)),
+        [
+            (base.name.clone(), vec![]),
+            ("Budget".to_string(), vec!["VINDI_2".to_string()])
+        ]
+    );
+    assert_eq!(
+        *heard.lock().unwrap(),
+        [Some(DataFile::Fits), Some(DataFile::Implants)]
+    );
+
+    // A set name moves the fit; an unknown one is an error with the fit's other errors.
+    let moved = DoctrineFitInput {
+        implant_set: Some(Some(base.name.clone())),
+        ..renamed.clone()
+    };
+    write(FitWrite::Update(&selector("VINDI_2"), &moved)).expect("moved");
+    assert_eq!(
+        set_fits(&store),
+        [
+            (base.name.clone(), vec!["VINDI_2".to_string()]),
+            ("Budget".to_string(), vec![])
+        ]
+    );
+    let unknown = DoctrineFitInput {
+        name: String::new(),
+        implant_set: Some(Some("Nope".into())),
+        ..renamed.clone()
+    };
+    let paths: Vec<String> = errors(write(FitWrite::Update(&selector("VINDI_2"), &unknown)))
+        .into_iter()
+        .map(|(path, _)| path)
+        .collect();
+    assert_eq!(paths, ["name", "implant_set"]);
+
+    // An update without the field keeps the set (nothing changed: nothing is written); `null`
+    // takes the fit out.
+    heard.lock().unwrap().clear();
+    write(FitWrite::Update(&selector("VINDI_2"), &renamed)).expect("kept");
+    assert_eq!(*heard.lock().unwrap(), []);
+    assert_eq!(
+        store.get().implant_set_of("VINDI_2"),
+        Some(base.name.as_str())
+    );
+    let cleared = DoctrineFitInput {
+        implant_set: Some(None),
+        ..renamed.clone()
+    };
+    write(FitWrite::Update(&selector("VINDI_2"), &cleared)).expect("cleared");
+    assert_eq!(store.get().implant_set_of("VINDI_2"), None);
+
+    // A created fit can name its set; deleting the fit takes it out of the set.
+    let created = DoctrineFitInput {
+        name: "VINDI_3".into(),
+        dna: Some(dna),
+        implant_set: Some(Some("Budget".into())),
+        ..Default::default()
+    };
+    write(FitWrite::Create(&created)).expect("created");
+    assert_eq!(store.get().implant_set_of("VINDI_3"), Some("Budget"));
+    write(FitWrite::Delete(&selector("VINDI_3"))).expect("deleted");
+    assert_eq!(
+        set_fits(&reopen(&store)),
+        [(base.name.clone(), vec![]), ("Budget".to_string(), vec![])]
+    );
+    // No dangling links (the renamed fit's skill plans no longer build, as documented).
+    let warnings = store.get().warnings.clone();
+    assert!(
+        !warnings.iter().any(|w| w.starts_with("implants.yaml")),
+        "{warnings:?}"
     );
 }
