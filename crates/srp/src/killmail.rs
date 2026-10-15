@@ -33,6 +33,10 @@ pub struct EnrichedVictim {
     pub corporation_id: Option<i64>,
     pub corporation_name: Option<String>,
     pub damage_taken: i64,
+    /// The faction of an NPC or faction-warfare victim; usually `null`. An addition to the
+    /// legacy shape.
+    pub faction_id: Option<i64>,
+    pub faction_name: Option<String>,
     pub items: Vec<EnrichedItem>,
     pub ship_type_id: i64,
     pub ship_name: String,
@@ -47,6 +51,10 @@ pub struct EnrichedAttacker {
     pub corporation_id: Option<i64>,
     pub corporation_name: Option<String>,
     pub damage_done: i64,
+    /// The NPC faction of an NPC attacker (e.g. `500019`, Sansha's Nation), whose character,
+    /// corporation and alliance are `null`; `null` for players. An addition to the legacy shape.
+    pub faction_id: Option<i64>,
+    pub faction_name: Option<String>,
     pub final_blow: bool,
     pub security_status: f64,
     pub ship_type_id: Option<i64>,
@@ -90,9 +98,14 @@ impl Srp {
         let mut ids = Vec::new();
         let v = &km.victim;
         ids.extend(
-            [v.character_id, v.corporation_id, v.alliance_id]
-                .into_iter()
-                .flatten(),
+            [
+                v.character_id,
+                v.corporation_id,
+                v.alliance_id,
+                v.faction_id,
+            ]
+            .into_iter()
+            .flatten(),
         );
         ids.push(v.ship_type_id);
         for a in &km.attackers {
@@ -101,6 +114,7 @@ impl Srp {
                     a.character_id,
                     a.corporation_id,
                     a.alliance_id,
+                    a.faction_id,
                     a.ship_type_id,
                     a.weapon_type_id,
                 ]
@@ -142,6 +156,8 @@ impl Srp {
                 corporation_id: v.corporation_id,
                 corporation_name: name(v.corporation_id),
                 damage_taken: v.damage_taken,
+                faction_id: v.faction_id,
+                faction_name: name(v.faction_id),
                 items: v
                     .items
                     .iter()
@@ -169,6 +185,8 @@ impl Srp {
                     corporation_id: a.corporation_id,
                     corporation_name: name(a.corporation_id),
                     damage_done: a.damage_done,
+                    faction_id: a.faction_id,
+                    faction_name: name(a.faction_id),
                     final_blow: a.final_blow,
                     security_status: a.security_status,
                     ship_type_id: a.ship_type_id,

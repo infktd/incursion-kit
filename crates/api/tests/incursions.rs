@@ -175,7 +175,8 @@ async fn active_incursions_are_public_and_enriched() {
 
     let res = app.get("/api/incursions", None).await;
     assert_eq!(res.status, 200, "{}", res.text());
-    assert_eq!(res.header("cache-control"), Some("public, max-age=60"));
+    assert_eq!(res.header("cache-control"), Some("public, no-cache"));
+    assert!(res.header("etag").is_some());
     let body: Value = res.json();
     assert!(body["last_poll_at"].is_string());
     assert!(body["data_modified_at"].is_null());
@@ -262,7 +263,8 @@ async fn one_incursion_has_its_full_history() {
 
     let res = app.get(&format!("/api/incursions/{id}"), None).await;
     assert_eq!(res.status, 200, "{}", res.text());
-    assert_eq!(res.header("cache-control"), Some("public, max-age=60"));
+    assert_eq!(res.header("cache-control"), Some("public, no-cache"));
+    assert!(res.header("etag").is_some());
     let spawn: Value = res.json();
     assert_eq!(spawn["influence_history"].as_array().unwrap().len(), 24);
     assert_eq!(spawn["influence_history"][0][1], 0.0);
@@ -359,6 +361,76 @@ async fn history_is_paginated_and_filtered() {
         .json();
     assert!(older["items"].as_array().unwrap().is_empty());
     assert!(older["next_before"].is_null());
+}
+
+async fn get_if_none_match(app: &TestApp, path: &str, etag: &str) -> common::TestResponse {
+    app.request(
+        TestApp::build(Method::GET, path, None)
+            .header("if-none-match", etag)
+            .body(axum::body::Body::empty())
+            .unwrap(),
+    )
+    .await
+}
+
+/// Responses must be revalidated (`no-cache`) and carry a strong `ETag`: a matching
+/// `If-None-Match` gets an empty `304`, and a change gives a new body and tag.
+#[tokio::test]
+async fn responses_revalidate_with_etags() {
+    let Some(app) = TestApp::new().await else {
+        return;
+    };
+    let path = "/api/incursions/log";
+    let res = app.get(path, None).await;
+    assert_eq!(res.status, 200);
+    assert_eq!(res.header("cache-control"), Some("public, no-cache"));
+    let etag = res.header("etag").unwrap().to_owned();
+    assert_eq!(etag, wl_api::cache::etag(&res.body));
+    assert!(etag.starts_with('"'), "a strong tag: {etag}");
+    let before = res.body.clone();
+
+    let res = get_if_none_match(&app, path, &etag).await;
+    assert_eq!(res.status, StatusCode::NOT_MODIFIED);
+    assert!(res.body.is_empty());
+    assert_eq!(res.header("etag"), Some(etag.as_str()));
+    assert_eq!(res.header("cache-control"), Some("public, no-cache"));
+    let res = get_if_none_match(&app, path, &format!("\"other\", W/{etag}")).await;
+    assert_eq!(
+        res.status,
+        StatusCode::NOT_MODIFIED,
+        "a list, weak comparison"
+    );
+
+    // The tracker records a change: the old tag no longer matches.
+    active_spawn(&app).await;
+    let res = get_if_none_match(&app, path, &etag).await;
+    assert_eq!(res.status, 200);
+    assert_ne!(res.body, before);
+    let new_etag = res.header("etag").unwrap();
+    assert_ne!(new_etag, etag);
+    assert_eq!(new_etag, wl_api::cache::etag(&res.body));
+
+    // Errors are not tagged; the stream is not buffered or tagged.
+    let res = get_if_none_match(&app, "/api/incursions/999999", "*").await;
+    assert_eq!(res.status, 404);
+    assert!(res.header("etag").is_none());
+    for path in [
+        "/api/incursions",
+        "/api/incursions/history",
+        "/api/incursions/windows",
+    ] {
+        let res = app.get(path, None).await;
+        assert_eq!(
+            res.header("cache-control"),
+            Some("public, no-cache"),
+            "{path}"
+        );
+        assert_eq!(
+            res.header("etag").map(str::to_owned),
+            Some(wl_api::cache::etag(&res.body)),
+            "{path}"
+        );
+    }
 }
 
 #[tokio::test]

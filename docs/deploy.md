@@ -243,7 +243,7 @@ customises. Its layout is the original waitlist's, so an existing directory work
 | `fits.dat` | Doctrine fits: an in-game fitting link dump (copy the fitting folder's links). |
 | `fitnotes.yaml` | Notes shown next to fits and tiers. |
 | `categories.yaml` | Waitlist categories and which hulls or modules put a fit in each. |
-| `skills.yaml` | Skill categories and per-hull skill tiers (`min`, `elite`, …). |
+| `skills.yaml` | Skill categories and per-hull skill tiers (`min`, `elite`, …). Name shared skill groups (YAML anchors merged into hulls) with a leading `_`, e.g. `_armor`: `GET /api/skills` lists them as groups, not hulls. |
 | `skillplan.yaml` | Skill plans. |
 | `modules.yaml` | Module alternatives, downgrades and fit-check exceptions. |
 | `implants.yaml` | The implant guide. |

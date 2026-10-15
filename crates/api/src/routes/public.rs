@@ -2,15 +2,15 @@
 //! the waitlist and its event stream needed a login).
 //!
 //! - `GET /api/public/status`: per non-archived waitlist its ID, name, open state and the number
-//!   of accounts waiting. No login; may be cached for 10 seconds.
+//!   of accounts waiting. No login; `Cache-Control: public, no-cache` with a strong `ETag`
+//!   (`If-None-Match` → `304`, see [`crate::cache`]).
 //! - `GET /api/public/stream`: live events for anonymous clients: the `status` topic
 //!   (`status_update`, `{"waitlist_id": …}`) and the `incursions` topic (`incursions_update`).
 //!   `/api/incursions/stream` keeps carrying only `incursions`.
 
 use axum::Json;
 use axum::extract::State;
-use axum::http::{HeaderValue, header};
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use serde::Serialize;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -19,13 +19,12 @@ use wl_live::topics;
 
 use super::waitlist::waitlist_rows;
 use crate::openapi::tags;
-use crate::{ApiResult, AppState};
-
-const CACHE_CONTROL: &str = "public, max-age=10";
+use crate::{ApiResult, AppState, cache};
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(status))
+        .layer(axum::middleware::from_fn(cache::revalidate))
         .routes(routes!(stream))
 }
 
@@ -49,17 +48,29 @@ struct PublicWaitlist {
 /// Public waitlist status
 ///
 /// For every non-archived waitlist: its name, whether it is open and how many accounts are
-/// waiting. No login needed; the answer may be cached for 10 seconds
-/// (`Cache-Control: public, max-age=10`). Clients refetch on `status_update` from
-/// `GET /api/public/stream`. An extension beyond the legacy API.
+/// waiting. No login needed. The answer carries `Cache-Control: public, no-cache` and a strong
+/// `ETag`: caches must revalidate, and a request whose `If-None-Match` matches gets an empty
+/// `304`. Clients refetch on `status_update` from `GET /api/public/stream`. An extension beyond
+/// the legacy API.
 #[utoipa::path(
     get,
     path = "/api/public/status",
     operation_id = "public_status",
     tag = tags::WAITLIST,
-    responses((status = 200, description = "The waitlists' status.", body = PublicStatus)),
+    responses(
+        (
+            status = 200,
+            description = "The waitlists' status.",
+            body = PublicStatus,
+            headers(
+                ("cache-control" = String, description = "`public, no-cache`"),
+                ("etag" = String, description = "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."),
+            ),
+        ),
+        (status = 304, description = "Not modified: `If-None-Match` matched the current `ETag` (empty body)."),
+    ),
 )]
-async fn status(State(state): State<AppState>) -> ApiResult<Response> {
+async fn status(State(state): State<AppState>) -> ApiResult<Json<PublicStatus>> {
     let waitlists = waitlist_rows(state.db(), false)
         .await?
         .into_iter()
@@ -70,12 +81,7 @@ async fn status(State(state): State<AppState>) -> ApiResult<Response> {
             waiting: w.waiting,
         })
         .collect();
-    let mut response = Json(PublicStatus { waitlists }).into_response();
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static(CACHE_CONTROL),
-    );
-    Ok(response)
+    Ok(Json(PublicStatus { waitlists }))
 }
 
 /// Public events

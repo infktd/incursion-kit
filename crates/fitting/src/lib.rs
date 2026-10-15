@@ -53,5 +53,7 @@ pub use skillplans::{
     LevelPair, SkillPlan, SkillPlanError, SkillPlanLevel, SkillPlans, SkillPlansResponse,
     SkillPlansResponsePlan, parse_skill_plans, skill_plans_to_yaml,
 };
-pub use skills::{SkillCategories, SkillData, SkillRequirements, SkillTier, SkillTiers};
+pub use skills::{
+    SkillCategories, SkillData, SkillRequirements, SkillTier, SkillTiers, is_skill_group,
+};
 pub use store::{DataStore, Validation};

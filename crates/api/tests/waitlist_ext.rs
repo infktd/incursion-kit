@@ -613,11 +613,22 @@ async fn public_status_and_stream() {
 
     let res = app.get("/api/public/status", None).await;
     assert_eq!(res.status, StatusCode::OK);
-    assert_eq!(res.header("cache-control"), Some("public, max-age=10"));
+    assert_eq!(res.header("cache-control"), Some("public, no-cache"));
+    let etag = res.header("etag").unwrap().to_owned();
     assert_eq!(
         res.json::<Value>(),
         json!({"waitlists": [{"id": 1, "name": "Main", "open": false, "waiting": 0}]})
     );
+    let if_none_match = |etag: String| {
+        let request = TestApp::build(Method::GET, "/api/public/status", None)
+            .header("if-none-match", etag)
+            .body(axum::body::Body::empty())
+            .unwrap();
+        app.request(request)
+    };
+    let res = if_none_match(etag.clone()).await;
+    assert_eq!(res.status, StatusCode::NOT_MODIFIED);
+    assert!(res.body.is_empty());
 
     let mut public = open_stream(&app, "/api/public/stream", None).await;
 
@@ -640,8 +651,11 @@ async fn public_status_and_stream() {
         next_chunk(&mut public).await,
         "event: incursions_update\ndata: {\"spawn_ids\":[1]}\n\n"
     );
-    let status = get_json(&app, "/api/public/status", None).await;
-    assert_eq!(status["waitlists"][0]["open"], json!(true));
+    // The refetch after the event revalidates: the old tag no longer matches.
+    let res = if_none_match(etag.clone()).await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_ne!(res.header("etag"), Some(etag.as_str()));
+    assert_eq!(res.json::<Value>()["waitlists"][0]["open"], json!(true));
 
     // The incursion stream still carries only incursions, the logged-in stream no status.
     let user = app.create_account(2, "User", None).await;

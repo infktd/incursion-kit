@@ -2,8 +2,10 @@
 //!
 //! - `GET /api/skills?character_id=` (own characters, or `skill-view`): loads the skills from
 //!   ESI (recording changes in `skill_current`/`skill_history`) and answers
-//!   `{current, ids, categories, requirements}`: the active level of every skill `skills.yaml`
-//!   mentions (0 if untrained), skill name → id, the skill categories and per-hull tiers.
+//!   `{current, ids, categories, requirements, requirement_keys}`: the active level of every
+//!   skill `skills.yaml` mentions (0 if untrained), skill name → id, the skill categories, the
+//!   tiers per skill set (hulls, and the file's shared `_` groups, as in the legacy waitlist) and
+//!   which `requirements` keys are hulls and which are groups (an addition).
 
 use std::collections::BTreeMap;
 
@@ -15,7 +17,7 @@ use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use wl_eve_data::{SkillLevel, TypeId};
-use wl_fitting::{PilotSkills, SkillCategories, SkillRequirements, SkillTiers};
+use wl_fitting::{PilotSkills, SkillCategories, SkillRequirements, SkillTiers, is_skill_group};
 
 use crate::openapi::tags;
 use crate::{ApiResult, AppState, AuthenticatedAccount};
@@ -42,10 +44,34 @@ struct SkillsResponse {
     /// Skill category name → skill type ids (`skills.yaml`).
     #[schema(value_type = BTreeMap<String, Vec<i32>>)]
     categories: SkillCategories,
-    /// Skill set (usually a hull name, or a variant such as `Armor Kronos`) → skill type id →
-    /// required levels.
+    /// Skill set → skill type id → required levels. A skill set is a hull (or a hull variant
+    /// such as `Armor Kronos`), or one of `skills.yaml`'s shared groups, whose names start with
+    /// `_` (`_generic`, `_armor`, …; the file merges them into hulls, so a hull's entry already
+    /// includes its groups' skills). The groups are listed as in the legacy waitlist;
+    /// `requirement_keys` tells them apart.
     #[schema(value_type = BTreeMap<String, BTreeMap<i32, SkillTiers>>)]
     requirements: SkillRequirements,
+    /// The keys of `requirements`, split into hulls and shared groups (sorted). An addition to
+    /// the legacy response.
+    requirement_keys: RequirementKeys,
+}
+
+#[derive(Serialize, ToSchema)]
+struct RequirementKeys {
+    /// Hulls and hull variants (`Vindicator`, `Armor Kronos`, …): the skill sets to show.
+    hulls: Vec<String>,
+    /// Shared skill groups (`_generic`, `_armor`, …): authoring blocks of `skills.yaml`.
+    groups: Vec<String>,
+}
+
+impl RequirementKeys {
+    fn of(requirements: &SkillRequirements) -> Self {
+        let (groups, hulls) = requirements
+            .keys()
+            .cloned()
+            .partition(|key| is_skill_group(key));
+        Self { hulls, groups }
+    }
 }
 
 /// A character's skills
@@ -89,5 +115,6 @@ async fn skills(
         ids: skill_data.name_lookup.clone(),
         categories: skill_data.categories.clone(),
         requirements: skill_data.requirements.clone(),
+        requirement_keys: RequirementKeys::of(&skill_data.requirements),
     }))
 }

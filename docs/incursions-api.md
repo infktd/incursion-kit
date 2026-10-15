@@ -9,8 +9,13 @@ Everything here is **new and additive**: no legacy endpoint or live event change
 of every response are in the OpenAPI spec ([openapi.json](openapi.json), or `/api/docs` on a
 running server); this page explains what the data means and how it is collected.
 
-- No login. Every JSON response carries `Cache-Control: public, max-age=60` (ESI refreshes
-  incursions every 5 minutes).
+- No login. Every JSON response carries `Cache-Control: public, no-cache` and a strong `ETag` (a
+  hash of the body): browsers and proxies may keep a copy but must revalidate it before reuse, so
+  a refetch after an `incursions_update` event always gets the current data. Send the tag back as
+  `If-None-Match` (browsers do this on their own) to get an empty `304 Not Modified` when nothing
+  changed. Bodies that contain the current time (`generated_at` and the countdowns of
+  `/api/incursions`, `/api/incursions/windows` and an active spawn's detail) change every second,
+  so for those a `304` is rare; history and log pages revalidate cheaply.
 - Times are RFC 3339 UTC strings (`2026-10-11T06:30:20Z`), except the influence series, which are
   `[unix_seconds, influence]` pairs for charting. Durations are seconds.
 - Influence is ESI's value, `0.0` to `1.0`.
@@ -125,7 +130,8 @@ disconnected and should reconnect and refetch.
 
 It is published after every poll that recorded something: a new spawn, a state change, the boss
 appearing or leaving, a staging change, an end (all in `changes`) or a new influence value
-(`influence_changed`). Clients refetch `/api/incursions` (or the affected `/api/incursions/{id}`).
+(`influence_changed`). Clients refetch `/api/incursions` (or the affected `/api/incursions/{id}`);
+the responses are never served from a cache without revalidation, so no cache-busting is needed.
 
 ## The `Spawn` object
 

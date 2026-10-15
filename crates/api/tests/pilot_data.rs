@@ -123,6 +123,25 @@ async fn skills_are_loaded_and_recorded() {
         data.skills.name_lookup.len()
     );
     assert!(body["categories"].is_object() && body["requirements"].is_object());
+    // Hulls and the data file's shared groups (legacy), told apart by `requirement_keys`.
+    let keys = |kind: &str| -> Vec<String> {
+        serde_json::from_value(body["requirement_keys"][kind].clone()).unwrap()
+    };
+    let (hulls, groups) = (keys("hulls"), keys("groups"));
+    assert!(hulls.iter().any(|h| h == "Vindicator"), "{hulls:?}");
+    assert!(groups.iter().any(|g| g == "_generic"), "{groups:?}");
+    assert!(hulls.iter().all(|h| !h.starts_with('_')));
+    assert!(groups.iter().all(|g| g.starts_with('_')));
+    let mut all: Vec<String> = hulls.into_iter().chain(groups).collect();
+    all.sort();
+    let mut requirements: Vec<String> = body["requirements"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect();
+    requirements.sort();
+    assert_eq!(all, requirements);
     let stored: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM skill_current WHERE character_id = 1001")
             .fetch_one(env.pool())

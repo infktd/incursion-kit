@@ -4,6 +4,7 @@
 
 pub mod auth;
 pub mod ban;
+pub mod cache;
 pub mod error;
 pub mod extract;
 pub mod openapi;

@@ -5198,7 +5198,13 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "`public, max-age=60`"
+                "description": "`public, no-cache`"
+              },
+              "etag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."
               }
             },
             "content": {
@@ -5208,6 +5214,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified: `If-None-Match` matched the current `ETag` (empty body)."
           },
           "500": {
             "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
@@ -5289,7 +5298,13 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "`public, max-age=60`"
+                "description": "`public, no-cache`"
+              },
+              "etag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."
               }
             },
             "content": {
@@ -5299,6 +5314,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified: `If-None-Match` matched the current `ETag` (empty body)."
           },
           "400": {
             "description": "`per_page must be between 1 and 100` or `band must be highsec, lowsec or nullsec`.",
@@ -5372,7 +5390,13 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "`public, max-age=60`"
+                "description": "`public, no-cache`"
+              },
+              "etag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."
               }
             },
             "content": {
@@ -5382,6 +5406,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified: `If-None-Match` matched the current `ETag` (empty body)."
           },
           "400": {
             "description": "`limit must be between 1 and 200`.",
@@ -5464,7 +5491,13 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "`public, max-age=60`"
+                "description": "`public, no-cache`"
+              },
+              "etag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."
               }
             },
             "content": {
@@ -5474,6 +5507,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified: `If-None-Match` matched the current `ETag` (empty body)."
           },
           "500": {
             "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
@@ -5516,7 +5552,13 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "`public, max-age=60`"
+                "description": "`public, no-cache`"
+              },
+              "etag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."
               }
             },
             "content": {
@@ -5526,6 +5568,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified: `If-None-Match` matched the current `ETag` (empty body)."
           },
           "404": {
             "description": "`incursion not found` (also for a non-numeric id).",
@@ -6114,11 +6159,25 @@
           "waitlist"
         ],
         "summary": "Public waitlist status",
-        "description": "For every non-archived waitlist: its name, whether it is open and how many accounts are\nwaiting. No login needed; the answer may be cached for 10 seconds\n(`Cache-Control: public, max-age=10`). Clients refetch on `status_update` from\n`GET /api/public/stream`. An extension beyond the legacy API.",
+        "description": "For every non-archived waitlist: its name, whether it is open and how many accounts are\nwaiting. No login needed. The answer carries `Cache-Control: public, no-cache` and a strong\n`ETag`: caches must revalidate, and a request whose `If-None-Match` matches gets an empty\n`304`. Clients refetch on `status_update` from `GET /api/public/stream`. An extension beyond\nthe legacy API.",
         "operationId": "public_status",
         "responses": {
           "200": {
             "description": "The waitlists' status.",
+            "headers": {
+              "cache-control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "`public, no-cache`"
+              },
+              "etag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -6126,6 +6185,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified: `If-None-Match` matched the current `ETag` (empty body)."
           },
           "500": {
             "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
@@ -9413,6 +9475,20 @@
             "type": "integer",
             "format": "int64"
           },
+          "faction_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The NPC faction of an NPC attacker (e.g. `500019`, Sansha's Nation), whose character,\ncorporation and alliance are `null`; `null` for players. An addition to the legacy shape."
+          },
+          "faction_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "final_blow": {
             "type": "boolean"
           },
@@ -9594,6 +9670,20 @@
           "damage_taken": {
             "type": "integer",
             "format": "int64"
+          },
+          "faction_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The faction of an NPC or faction-warfare victim; usually `null`. An addition to the\nlegacy shape."
+          },
+          "faction_name": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "items": {
             "type": "array",
@@ -10746,7 +10836,7 @@
       },
       "KillmailAttacker": {
         "type": "object",
-        "description": "An attacker on a killmail (character, corporation and alliance ids are absent for NPCs).",
+        "description": "An attacker on a killmail (character, corporation and alliance ids are absent for NPCs, which\ncarry their `faction_id` instead).",
         "required": [
           "damage_done",
           "final_blow",
@@ -10777,6 +10867,14 @@
           "damage_done": {
             "type": "integer",
             "format": "int64"
+          },
+          "faction_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The NPC faction of an NPC attacker (e.g. `500019`, Sansha's Nation); `null` for players.\nAn addition to the legacy shape."
           },
           "final_blow": {
             "type": "boolean"
@@ -10923,6 +11021,14 @@
           "damage_taken": {
             "type": "integer",
             "format": "int64"
+          },
+          "faction_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The faction of an NPC or faction-warfare victim; usually `null`. An addition to the\nlegacy shape."
           },
           "items": {
             "type": "array",
@@ -11420,6 +11526,29 @@
           }
         }
       },
+      "RequirementKeys": {
+        "type": "object",
+        "required": [
+          "hulls",
+          "groups"
+        ],
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Shared skill groups (`_generic`, `_armor`, …): authoring blocks of `skills.yaml`."
+          },
+          "hulls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hulls and hull variants (`Vindicator`, `Armor Kronos`, …): the skill sets to show."
+          }
+        }
+      },
       "Role": {
         "type": "string",
         "description": "The role of an infested system.",
@@ -11847,7 +11976,8 @@
           "current",
           "ids",
           "categories",
-          "requirements"
+          "requirements",
+          "requirement_keys"
         ],
         "properties": {
           "categories": {
@@ -11887,9 +12017,13 @@
               "type": "string"
             }
           },
+          "requirement_keys": {
+            "$ref": "#/components/schemas/RequirementKeys",
+            "description": "The keys of `requirements`, split into hulls and shared groups (sorted). An addition to\nthe legacy response."
+          },
           "requirements": {
             "type": "object",
-            "description": "Skill set (usually a hull name, or a variant such as `Armor Kronos`) → skill type id →\nrequired levels.",
+            "description": "Skill set → skill type id → required levels. A skill set is a hull (or a hull variant\nsuch as `Armor Kronos`), or one of `skills.yaml`'s shared groups, whose names start with\n`_` (`_generic`, `_armor`, …; the file merges them into hulls, so a hull's entry already\nincludes its groups' skills). The groups are listed as in the legacy waitlist;\n`requirement_keys` tells them apart.",
             "additionalProperties": {
               "type": "object",
               "additionalProperties": {

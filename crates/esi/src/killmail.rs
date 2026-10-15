@@ -20,13 +20,18 @@ pub struct KillmailData {
     pub war_id: Option<i64>,
 }
 
-/// An attacker on a killmail (character, corporation and alliance ids are absent for NPCs).
+/// An attacker on a killmail (character, corporation and alliance ids are absent for NPCs, which
+/// carry their `faction_id` instead).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct KillmailAttacker {
     pub alliance_id: Option<i64>,
     pub character_id: Option<i64>,
     pub corporation_id: Option<i64>,
     pub damage_done: i64,
+    /// The NPC faction of an NPC attacker (e.g. `500019`, Sansha's Nation); `null` for players.
+    /// An addition to the legacy shape.
+    #[serde(default)]
+    pub faction_id: Option<i64>,
     pub final_blow: bool,
     pub security_status: f64,
     /// Type id of the attacker's ship.
@@ -42,6 +47,10 @@ pub struct KillmailVictim {
     pub character_id: Option<i64>,
     pub corporation_id: Option<i64>,
     pub damage_taken: i64,
+    /// The faction of an NPC or faction-warfare victim; usually `null`. An addition to the
+    /// legacy shape.
+    #[serde(default)]
+    pub faction_id: Option<i64>,
     pub items: Vec<KillmailItem>,
     /// Missing for some killmails (ESI marks it optional).
     pub position: Option<Position>,
@@ -82,6 +91,7 @@ impl Esi {
                     character_id: a.character_id,
                     corporation_id: a.corporation_id,
                     damage_done: a.damage_done,
+                    faction_id: a.faction_id,
                     final_blow: a.final_blow,
                     security_status: a.security_status,
                     ship_type_id: a.ship_type_id,
@@ -97,6 +107,7 @@ impl Esi {
                 character_id: km.victim.character_id,
                 corporation_id: km.victim.corporation_id,
                 damage_taken: km.victim.damage_taken,
+                faction_id: km.victim.faction_id,
                 items: km
                     .victim
                     .items

@@ -68,8 +68,17 @@ impl SkillTiers {
     }
 }
 
-/// Requirements per skill set (usually a hull name, or a variant such as "Armor Kronos").
+/// Requirements per skill set (usually a hull name, or a variant such as "Armor Kronos"; see
+/// [`is_skill_group`] for the shared groups).
 pub type SkillRequirements = BTreeMap<String, BTreeMap<TypeId, SkillTiers>>;
+
+/// Whether a `requirements` key of `skills.yaml` is a shared skill group rather than a hull (or
+/// hull variant): a block such as `_generic` or `_armor` that the file merges into hulls with
+/// YAML anchors (`<<: *armor`). Groups are named with a leading `_`; they are loaded, and served
+/// by `GET /api/skills`, like any other skill set, as in the legacy waitlist.
+pub fn is_skill_group(skill_set: &str) -> bool {
+    skill_set.starts_with('_')
+}
 /// Skill category name → skills.
 pub type SkillCategories = BTreeMap<String, Vec<TypeId>>;
 
@@ -163,5 +172,18 @@ fn extend_with_prerequisites(skills: &mut BTreeSet<TypeId>, fits: &DoctrineFits,
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_skill_group;
+
+    #[test]
+    fn groups_have_a_leading_underscore() {
+        assert!(is_skill_group("_generic"));
+        assert!(is_skill_group("_rigging"));
+        assert!(!is_skill_group("Vindicator"));
+        assert!(!is_skill_group("Armor Kronos"));
     }
 }

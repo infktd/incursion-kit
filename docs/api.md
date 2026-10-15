@@ -27,6 +27,11 @@ permission, is in the OpenAPI reference.
   says which.
 - **Responses.** JSON, except where the spec says `text/plain`: several endpoints answer with a
   plain-text `OK` (or a short message), and every error is plain text.
+- **Caching.** Responses carry no cache headers unless noted. The public reads that a live
+  stream announces changes of (`GET /api/incursions*`, `GET /api/public/status`) send
+  `Cache-Control: public, no-cache` with a strong `ETag` (a hash of the body) and answer a
+  matching `If-None-Match` (a list, `W/` ignored, or `*`) with an empty `304 Not Modified`: caches
+  must revalidate before reuse, so a refetch after a stream event never sees stale data.
 - **Ids.** Accounts are identified by their main character's id. Character, corporation,
   alliance and type ids are EVE ids. Times are Unix seconds unless a field says otherwise (the
   incursion tracker uses RFC 3339 strings).
@@ -234,10 +239,30 @@ null, …}` as before.
 
 **Public status.** For logged-out visitors:
 
-- `GET /api/public/status` (no login, `Cache-Control: public, max-age=10`): `{"waitlists":
-  [{"id", "name", "open", "waiting"}]}` for every non-archived waitlist.
+- `GET /api/public/status` (no login; `Cache-Control: public, no-cache` with an `ETag`, see
+  [Conventions](#conventions)): `{"waitlists": [{"id", "name", "open", "waiting"}]}` for every
+  non-archived waitlist.
 - `GET /api/public/stream` (no login): `status_update` (`{"waitlist_id"}`, refetch the status)
   and `incursions_update` events.
+
+**Killmail factions.** The SRP killmail views name NPC killers. An NPC attacker has no
+character, corporation or alliance; ESI gives its `faction_id` instead (`500019`, Sansha's
+Nation, for incursion losses).
+
+- `GET /api/admin/srp/reports/{killmail_id}/killmail`: each of `attackers[]` and the `victim` has
+  `faction_id` (`null` for players).
+- `GET /api/admin/srp/reports/{killmail_id}/killmail/enriched`: the same, plus `faction_name`
+  (`null` when there is no faction or the name could not be resolved).
+
+**Skill sets.** `GET /api/skills?character_id=` answers `requirements` (skill set → skill type
+id → `{min, elite, gold, priority}`) with one entry per top-level key of `skills.yaml`'s
+`requirements`, as the legacy waitlist did. Those keys are hulls and hull variants (`Vindicator`,
+`Armor Kronos`, …) and also the file's **shared skill groups**: the blocks whose names start with
+`_` (`_generic`, `_armor`, `_shield`, `_gunnery`, `_logistics`, `_rigging`, …), which the file
+merges into hulls with YAML anchors (`<<: *armor`). A hull's entry already contains the skills of
+the groups it merges, so a client lists the hulls and can ignore the groups. Rather than relying
+on the `_` prefix, read the additive `requirement_keys`: `{"hulls": [..], "groups": [..]}`, the
+keys of `requirements` split by kind (each sorted).
 
 ## Health
 

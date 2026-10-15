@@ -1,5 +1,6 @@
-//! The public incursion tracker (`docs/incursions-api.md`). No login; responses may be cached
-//! for a minute (ESI refreshes every five).
+//! The public incursion tracker (`docs/incursions-api.md`). No login. JSON responses carry
+//! `Cache-Control: public, no-cache` and a strong `ETag` and answer `If-None-Match` with `304`
+//! ([`crate::cache`]), so a refetch after an `incursions_update` event never sees stale data.
 //!
 //! - `GET /api/incursions`: active spawns, enriched.
 //! - `GET /api/incursions/{id}`: one spawn with its full influence history and events.
@@ -13,8 +14,7 @@ use std::sync::LazyLock;
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderValue, header};
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -26,28 +26,17 @@ use wl_incursions::view::{self, Context, HistoryPage, LogPage, SpawnView, Window
 use wl_live::topics;
 
 use crate::openapi::tags;
-use crate::{ApiError, ApiResult, AppState};
-
-const CACHE_CONTROL: &str = "public, max-age=60";
+use crate::{ApiError, ApiResult, AppState, cache};
 
 pub fn routes() -> OpenApiRouter<AppState> {
-    OpenApiRouter::new()
+    let json = OpenApiRouter::new()
         .routes(routes!(active))
         .routes(routes!(history))
         .routes(routes!(log))
         .routes(routes!(windows))
-        .routes(routes!(stream))
         .routes(routes!(detail))
-}
-
-/// JSON with a public cache header.
-fn cached<T: Serialize>(body: T) -> Response {
-    let mut response = Json(body).into_response();
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static(CACHE_CONTROL),
-    );
-    response
+        .layer(axum::middleware::from_fn(cache::revalidate));
+    json.routes(routes!(stream))
 }
 
 fn now() -> i64 {
@@ -84,18 +73,24 @@ struct ActiveResponse {
     path = "/api/incursions",
     operation_id = "incursions_active",
     tag = tags::INCURSIONS,
-    responses((
-        status = 200,
-        description = "Active spawns.",
-        body = ActiveResponse,
-        headers(("cache-control" = String, description = "`public, max-age=60`")),
-    )),
+    responses(
+        (
+            status = 200,
+            description = "Active spawns.",
+            body = ActiveResponse,
+            headers(
+                ("cache-control" = String, description = "`public, no-cache`"),
+                ("etag" = String, description = "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."),
+            ),
+        ),
+        (status = 304, description = "Not modified: `If-None-Match` matched the current `ETag` (empty body)."),
+    ),
 )]
-async fn active(State(state): State<AppState>) -> ApiResult<Response> {
+async fn active(State(state): State<AppState>) -> ApiResult<Json<ActiveResponse>> {
     let now = now();
     let tracker = store::tracker_state(state.db()).await?;
     let incursions = view::active(state.db(), &context(&state, now)).await?;
-    Ok(cached(ActiveResponse {
+    Ok(Json(ActiveResponse {
         generated_at: rfc3339(now),
         last_poll_at: tracker.map(|t| rfc3339(t.last_poll_at)),
         data_modified_at: tracker.and_then(|t| t.data_modified_at).map(rfc3339),
@@ -117,18 +112,25 @@ async fn active(State(state): State<AppState>) -> ApiResult<Response> {
             status = 200,
             description = "The spawn.",
             body = SpawnView,
-            headers(("cache-control" = String, description = "`public, max-age=60`")),
+            headers(
+                ("cache-control" = String, description = "`public, no-cache`"),
+                ("etag" = String, description = "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."),
+            ),
         ),
+        (status = 304, description = "Not modified: `If-None-Match` matched the current `ETag` (empty body)."),
         (status = 404, description = "`incursion not found` (also for a non-numeric id).", body = String, content_type = "text/plain"),
     ),
 )]
-async fn detail(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult<Response> {
+async fn detail(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<SpawnView>> {
     let not_found = || ApiError::not_found("incursion not found");
     let id: i64 = id.parse().map_err(|_| not_found())?;
     let spawn = view::detail(state.db(), &context(&state, now()), id)
         .await?
         .ok_or_else(not_found)?;
-    Ok(cached(spawn))
+    Ok(Json(spawn))
 }
 
 #[derive(Deserialize, IntoParams)]
@@ -167,15 +169,19 @@ fn band(value: Option<String>) -> ApiResult<Option<String>> {
             status = 200,
             description = "A page of ended spawns.",
             body = HistoryPage,
-            headers(("cache-control" = String, description = "`public, max-age=60`")),
+            headers(
+                ("cache-control" = String, description = "`public, no-cache`"),
+                ("etag" = String, description = "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."),
+            ),
         ),
+        (status = 304, description = "Not modified: `If-None-Match` matched the current `ETag` (empty body)."),
         (status = 400, description = "`per_page must be between 1 and 100` or `band must be highsec, lowsec or nullsec`.", body = String, content_type = "text/plain"),
     ),
 )]
 async fn history(
     State(state): State<AppState>,
     Query(query): Query<HistoryQuery>,
-) -> ApiResult<Response> {
+) -> ApiResult<Json<HistoryPage>> {
     let per_page = query.per_page.unwrap_or(20);
     if !(1..=100).contains(&per_page) {
         return Err(ApiError::bad_request("per_page must be between 1 and 100"));
@@ -193,7 +199,7 @@ async fn history(
         per_page,
     )
     .await?;
-    Ok(cached(page))
+    Ok(Json(page))
 }
 
 #[derive(Deserialize, IntoParams)]
@@ -219,17 +225,24 @@ struct LogQuery {
             status = 200,
             description = "A page of events.",
             body = LogPage,
-            headers(("cache-control" = String, description = "`public, max-age=60`")),
+            headers(
+                ("cache-control" = String, description = "`public, no-cache`"),
+                ("etag" = String, description = "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."),
+            ),
         ),
+        (status = 304, description = "Not modified: `If-None-Match` matched the current `ETag` (empty body)."),
         (status = 400, description = "`limit must be between 1 and 200`.", body = String, content_type = "text/plain"),
     ),
 )]
-async fn log(State(state): State<AppState>, Query(query): Query<LogQuery>) -> ApiResult<Response> {
+async fn log(
+    State(state): State<AppState>,
+    Query(query): Query<LogQuery>,
+) -> ApiResult<Json<LogPage>> {
     let limit = query.limit.unwrap_or(50);
     if !(1..=200).contains(&limit) {
         return Err(ApiError::bad_request("limit must be between 1 and 200"));
     }
-    Ok(cached(view::log(state.db(), query.before, limit).await?))
+    Ok(Json(view::log(state.db(), query.before, limit).await?))
 }
 
 /// Spawn windows
@@ -241,21 +254,27 @@ async fn log(State(state): State<AppState>, Query(query): Query<LogQuery>) -> Ap
     path = "/api/incursions/windows",
     operation_id = "incursions_windows",
     tag = tags::INCURSIONS,
-    responses((
-        status = 200,
-        description = "Spawn windows per band.",
-        body = WindowsView,
-        headers(("cache-control" = String, description = "`public, max-age=60`")),
-    )),
+    responses(
+        (
+            status = 200,
+            description = "Spawn windows per band.",
+            body = WindowsView,
+            headers(
+                ("cache-control" = String, description = "`public, no-cache`"),
+                ("etag" = String, description = "Strong entity tag of the body; send it as `If-None-Match` to get a `304`."),
+            ),
+        ),
+        (status = 304, description = "Not modified: `If-None-Match` matched the current `ETag` (empty body)."),
+    ),
 )]
-async fn windows(State(state): State<AppState>) -> ApiResult<Response> {
+async fn windows(State(state): State<AppState>) -> ApiResult<Json<WindowsView>> {
     let slots = &state.config().incursion_tracker.slots;
     let slots = HashMap::from([
         (SecurityBand::Highsec, slots.highsec),
         (SecurityBand::Lowsec, slots.lowsec),
         (SecurityBand::Nullsec, slots.nullsec),
     ]);
-    Ok(cached(view::windows(state.db(), now(), &slots).await?))
+    Ok(Json(view::windows(state.db(), now(), &slots).await?))
 }
 
 /// Incursion events

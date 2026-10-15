@@ -54,7 +54,11 @@ async fn mock_killmail(server: &MockServer) {
                 "ship_type_id": 17740,
                 "items": [{"flag": 27, "item_type_id": 3170, "quantity_destroyed": 1, "singleton": 0}],
             },
-            "attackers": [{"damage_done": 5000, "final_blow": true, "security_status": 0.0}],
+            "attackers": [
+                {"damage_done": 4000, "final_blow": true, "security_status": 0.0},
+                {"faction_id": 500019, "damage_done": 1000, "final_blow": false,
+                 "security_status": 0.0},
+            ],
         })))
         .mount(server)
         .await;
@@ -322,6 +326,37 @@ async fn report_lifecycle() {
         .await
         .json();
     assert_eq!(km["victim"]["character_id"], VICTIM);
+    assert!(km["victim"]["faction_id"].is_null());
+    assert!(km["attackers"][0]["faction_id"].is_null());
+    assert_eq!(km["attackers"][1]["faction_id"], 500019);
+    assert!(km["attackers"][1]["character_id"].is_null());
+
+    // The enriched killmail names the NPC attacker's faction.
+    Mock::given(method("POST"))
+        .and(path_regex(r"/universe/names/?$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+            {"id": VICTIM, "name": "Victim", "category": "character"},
+            {"id": 500019, "name": "Sansha's Nation", "category": "faction"},
+        ])))
+        .mount(&server)
+        .await;
+    let enriched: Value = app
+        .get(
+            &format!("/api/admin/srp/reports/{KILLMAIL}/killmail/enriched"),
+            Some(&admin),
+        )
+        .await
+        .json();
+    assert_eq!(enriched["victim"]["character_name"], "Victim");
+    assert!(enriched["victim"]["faction_id"].is_null());
+    assert!(enriched["victim"]["faction_name"].is_null());
+    let attackers = enriched["attackers"].as_array().unwrap();
+    assert_eq!(attackers.len(), 2);
+    assert!(attackers[0]["faction_id"].is_null());
+    assert!(attackers[0]["faction_name"].is_null());
+    assert_eq!(attackers[1]["faction_id"], 500019);
+    assert_eq!(attackers[1]["faction_name"], "Sansha's Nation");
+    assert!(attackers[1]["character_name"].is_null());
     let fleet: Value = app
         .get(
             &format!("/api/admin/srp/reports/{KILLMAIL}/fleet-validation"),
