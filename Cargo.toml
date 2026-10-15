@@ -45,7 +45,7 @@ tower-http = { version = "0.7.1", features = ["trace", "request-id", "util"] }
 http = "1.5.0"
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "form", "query"] }
 url = "2.5.8"
-eve-esi-client = "0.6.0"
+eve-esi-client = "0.7.0"
 utoipa = { version = "6.0.0", features = ["chrono", "preserve_order"] }
 utoipa-axum = "0.3.0"
 utoipa-scalar = { version = "0.4.0", features = ["axum"] }

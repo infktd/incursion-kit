@@ -4,12 +4,6 @@ all-features = false
 [advisories]
 version = 2
 yanked = "deny"
-ignore = [
-  # unsafe-libyaml (unmaintained) reaches us only as a build dependency of eve-esi-client's code
-  # generator (progenitor -> progenitor-macro -> serde_yaml); it never ships in the binary.
-  # eve-esi-client 0.7 drops it: remove this entry when upgrading.
-  { id = "RUSTSEC-2024-0449", reason = "build-time only, via eve-esi-client 0.6's codegen" },
-]
 
 [licenses]
 version = 2
