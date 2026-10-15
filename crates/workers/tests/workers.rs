@@ -361,6 +361,11 @@ async fn fleet_updater_unregisters_fleets_the_boss_cannot_read() {
     .await;
     env.exec("INSERT INTO fleet (id, boss_id) VALUES (5, 101)")
         .await;
+    // 102's token lacks the fleet scopes.
+    env.character(102, "Scopeless Boss").await;
+    env.tokens(102, "publicData").await;
+    env.exec("INSERT INTO fleet (id, boss_id) VALUES (6, 102)")
+        .await;
     Mock::given(method("GET"))
         .and(path("/fleets/5/members"))
         .respond_with(ResponseTemplate::new(404).set_body_json(json!({"error": "not boss"})))
@@ -368,7 +373,8 @@ async fn fleet_updater_unregisters_fleets_the_boss_cannot_read() {
         .await;
 
     let live = Hub::new();
-    // BOSS has no token at all; 101 is no longer the boss. Both get unregistered.
+    // BOSS has no token at all; 101 is no longer the boss; 102 lacks the scope. All get
+    // unregistered.
     let updater = fleet_updater(&env, &live, 1);
     updater.run_once().await.unwrap();
     assert_eq!(env.scalar("SELECT COUNT(*) FROM fleet").await, 0);
@@ -378,6 +384,150 @@ async fn fleet_updater_unregisters_fleets_the_boss_cannot_read() {
         updater.update_fleet(FLEET).await.unwrap(),
         FleetUpdate::default()
     );
+}
+
+/// An unsigned EVE-style access token for `character_id` (what the SSO returns on refresh).
+fn jwt(character_id: i64, scopes: &[&str]) -> String {
+    use base64::Engine as _;
+    let b64 = |v: &Value| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(v.to_string());
+    format!(
+        "{}.{}.sig",
+        b64(&json!({"alg": "RS256", "kid": "JWT-Signature-Key"})),
+        b64(&json!({
+            "sub": format!("CHARACTER:EVE:{character_id}"), "name": "Boss", "owner": "owner",
+            "scp": scopes, "aud": ["client", "EVE Online"], "iss": "https://login.eveonline.com",
+        }))
+    )
+}
+
+/// A registered fleet bossed by BOSS (with tokens) and linked to waitlist 1.
+async fn linked_fleet(env: &Env) {
+    env.character(BOSS, "Boss").await;
+    env.tokens(BOSS, "esi-fleets.read_fleet.v1").await;
+    env.exec(&format!(
+        "INSERT INTO fleet (id, boss_id) VALUES ({FLEET}, {BOSS})"
+    ))
+    .await;
+    env.exec(&format!(
+        "INSERT INTO fleet_waitlist (fleet_id, waitlist_id) VALUES ({FLEET}, 1)"
+    ))
+    .await;
+}
+
+/// ESI rejects the stored access token (as after an SSO key change); the refresh gives a new one.
+async fn reject_stored_token(env: &Env) {
+    Mock::given(method("GET"))
+        .and(path(format!("/fleets/{FLEET}/members")))
+        .and(header(
+            "authorization",
+            format!("Bearer access-{BOSS}").as_str(),
+        ))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_json(json!({"error": "token is not valid"})),
+        )
+        .mount(&env.server)
+        .await;
+}
+
+#[tokio::test]
+async fn fleet_updater_refreshes_a_rejected_token_once() {
+    let Some(env) = Env::new().await else { return };
+    linked_fleet(&env).await;
+    reject_stored_token(&env).await;
+    let fresh = jwt(BOSS, &["esi-fleets.read_fleet.v1"]);
+    Mock::given(method("POST"))
+        .and(path("/v2/oauth/token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token": fresh, "token_type": "Bearer", "expires_in": 1199,
+            "refresh_token": "rotated",
+        })))
+        .expect(1)
+        .mount(&env.server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!("/fleets/{FLEET}/members")))
+        .and(header("authorization", format!("Bearer {fresh}").as_str()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([member(BOSS, 17740)])))
+        .mount(&env.server)
+        .await;
+
+    let update = fleet_updater(&env, &Hub::new(), 1)
+        .update_fleet(FLEET)
+        .await
+        .unwrap();
+    assert!(!update.unregistered);
+    assert!(update.comp_changed);
+    assert_eq!(
+        env.scalar("SELECT COUNT(*) FROM fleet_waitlist").await,
+        1,
+        "kept"
+    );
+}
+
+#[tokio::test]
+async fn fleet_updater_unregisters_a_fleet_whose_token_is_dead() {
+    // The refresh token is revoked too, or the fresh token is rejected again.
+    for refresh_revoked in [true, false] {
+        let Some(env) = Env::new().await else { return };
+        linked_fleet(&env).await;
+        let response = if refresh_revoked {
+            ResponseTemplate::new(400).set_body_json(json!({"error": "invalid_grant"}))
+        } else {
+            ResponseTemplate::new(200).set_body_json(json!({
+                "access_token": jwt(BOSS, &["esi-fleets.read_fleet.v1"]), "token_type": "Bearer",
+                "expires_in": 1199, "refresh_token": "rotated",
+            }))
+        };
+        Mock::given(method("POST"))
+            .and(path("/v2/oauth/token"))
+            .respond_with(response)
+            .expect(1)
+            .mount(&env.server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path(format!("/fleets/{FLEET}/members")))
+            .respond_with(
+                ResponseTemplate::new(401).set_body_json(json!({"error": "token is not valid"})),
+            )
+            .mount(&env.server)
+            .await;
+
+        let live = Hub::new();
+        let mut sub = live.subscribe(vec![
+            topics::FLEET_COMP.into(),
+            topics::WAITLIST.into(),
+            topics::STATUS.into(),
+        ]);
+        let updater = fleet_updater(&env, &live, 1);
+        updater.run_once().await.unwrap();
+        assert_eq!(
+            env.scalar("SELECT COUNT(*) FROM fleet").await,
+            0,
+            "{refresh_revoked}"
+        );
+        assert_eq!(env.scalar("SELECT COUNT(*) FROM fleet_waitlist").await, 0);
+        let data = format!("{{\"fleet_id\":{FLEET}}}");
+        assert_eq!(
+            next_event(&mut sub).await,
+            (topics::FLEET_COMP.into(), events::COMP_UPDATE.into(), data)
+        );
+        let data = r#"{"waitlist_id":1}"#.to_string();
+        assert_eq!(
+            next_event(&mut sub).await,
+            (
+                topics::WAITLIST.into(),
+                events::WAITLIST_UPDATE.into(),
+                data.clone()
+            )
+        );
+        assert_eq!(
+            next_event(&mut sub).await,
+            (topics::STATUS.into(), events::STATUS_UPDATE.into(), data)
+        );
+        no_event(&mut sub).await;
+        // Nothing left to retry.
+        updater.run_once().await.unwrap();
+    }
 }
 
 #[tokio::test]

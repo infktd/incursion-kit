@@ -2,7 +2,10 @@
 //!
 //! The legacy waitlist publishes `waitlist_update` (`{"waitlist_id": i64}`) on the `waitlist`
 //! topic after most mutations, and on x-up first `message` (`{"message": "New x-up in
-//! waitlist"}`) to the account of every registered fleet's boss.
+//! waitlist"}`) to the account of every registered fleet's boss. Every `waitlist_update` is now
+//! paired with `status_update` (same data) on the public `status` topic, and it is also sent
+//! where the legacy waitlist was silent but the waitlist's gate or status data changes
+//! (emptying, invites, waitlist administration, fleets linked to a waitlist).
 //!
 //! The legacy waitlist sent `message` to `account;<boss character id>`, which nobody receives
 //! when the boss is an alt (topics are keyed by account). It now goes to the boss's account.
@@ -13,25 +16,14 @@ use wl_live::{events, topics};
 use crate::{ApiError, ApiResult, AppState};
 
 #[derive(Serialize)]
-struct WaitlistUpdate {
-    waitlist_id: i64,
-}
-
-#[derive(Serialize)]
 struct Message {
     message: &'static str,
 }
 
-/// `waitlist_update` on the `waitlist` topic.
+/// `waitlist_update` on the `waitlist` topic and `status_update` on the public `status` topic.
 pub fn waitlist_update(state: &AppState, waitlist_id: i64) -> ApiResult<()> {
-    state
-        .live()
-        .publish_json(
-            topics::WAITLIST,
-            events::WAITLIST_UPDATE,
-            &WaitlistUpdate { waitlist_id },
-        )
-        .map_err(ApiError::internal)
+    state.live().waitlist_changed(waitlist_id);
+    Ok(())
 }
 
 /// After an x-up: `message` to the account of every registered fleet's boss, then

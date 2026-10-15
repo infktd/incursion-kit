@@ -1,10 +1,12 @@
 //! Fleet registration, status, members, composition and MOTD role assignment (ESI-backed).
 //!
-//! - `GET /api/fleet/status` (`fleet-view`): every registered fleet and its boss.
+//! - `GET /api/fleet/status` (`fleet-view`): every registered fleet, its boss and (an extension)
+//!   the waitlist it is linked to.
 //! - `GET /api/fleet/info?character_id=` (`fleet-view`, own character): the character's current
 //!   fleet and its wings/squads (the character must be the boss).
 //! - `POST /api/fleet/register` (`fleet-configure`, own character): register a fleet with a squad
-//!   per waitlist category. `200 OK`.
+//!   per waitlist category, optionally linked to a waitlist (`waitlist_id`, an extension: the
+//!   fleet's boss then shows as that waitlist's FC in `GET /api/waitlist/gates`). `200 OK`.
 //! - `POST /api/fleet/close` (`fleet-configure`, own character): kick everyone else from the
 //!   character's fleet. Plain-text summary.
 //! - `GET /api/fleet/members?character_id=` (`fleet-view`, own character): members of the
@@ -161,6 +163,9 @@ struct FleetStatusFleet {
     id: i64,
     /// The character that registered the fleet (`corporation_id` is always `null`).
     boss: Character,
+    /// The waitlist the fleet was registered for (`waitlist_id` of `POST /api/fleet/register`),
+    /// `null` if none. An extension beyond the legacy API.
+    waitlist_id: Option<i64>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -170,8 +175,8 @@ struct FleetStatusResponse {
 
 /// Registered fleets
 ///
-/// Every fleet registered with `POST /api/fleet/register`, with the boss that registered it.
-/// Requires `fleet-view`. Reads only the database (no ESI call), so a fleet that has since
+/// Every fleet registered with `POST /api/fleet/register`, with the boss that registered it
+/// and the waitlist it was registered for (`waitlist_id`, an extension). Requires `fleet-view`. Reads only the database (no ESI call), so a fleet that has since
 /// closed stays listed until the fleet updater drops it.
 #[utoipa::path(
     get,
@@ -185,22 +190,24 @@ async fn fleet_status(
     account: AuthenticatedAccount,
 ) -> ApiResult<Json<FleetStatusResponse>> {
     account.require_access("fleet-view")?;
-    let rows: Vec<(i64, i64, String)> = sqlx::query_as(
-        "SELECT fleet.id, fleet.boss_id, `character`.name FROM fleet \
-         JOIN `character` ON fleet.boss_id = `character`.id",
+    let rows: Vec<(i64, i64, String, Option<i64>)> = sqlx::query_as(
+        "SELECT fleet.id, fleet.boss_id, `character`.name, fleet_waitlist.waitlist_id FROM fleet \
+         JOIN `character` ON fleet.boss_id = `character`.id \
+         LEFT JOIN fleet_waitlist ON fleet_waitlist.fleet_id = fleet.id",
     )
     .fetch_all(state.db())
     .await?;
     Ok(Json(FleetStatusResponse {
         fleets: rows
             .into_iter()
-            .map(|(id, boss_id, name)| FleetStatusFleet {
+            .map(|(id, boss_id, name, waitlist_id)| FleetStatusFleet {
                 id,
                 boss: Character {
                     id: boss_id,
                     name,
                     corporation_id: None,
                 },
+                waitlist_id,
             })
             .collect(),
     }))
@@ -256,6 +263,11 @@ struct RegisterRequest {
     /// configured category needs an entry; extra keys are ignored.
     #[schema(value_type = HashMap<String, Vec<i64>>, example = json!({"logi": [1, 2], "dps": [1, 3]}))]
     assignments: HashMap<String, (i64, i64)>,
+    /// The waitlist (fleet type) this fleet serves: its boss is shown as that waitlist's FC in
+    /// `GET /api/waitlist/gates`. Must be an existing, non-archived waitlist. Omitted: the
+    /// fleet is linked to none. An extension beyond the legacy API.
+    #[serde(default)]
+    waitlist_id: Option<i64>,
 }
 
 /// Register a fleet
@@ -263,7 +275,10 @@ struct RegisterRequest {
 /// Makes `character_id` the boss of `fleet_id` and stores which squad each waitlist category
 /// is invited into, replacing any previous registration of the fleet. Requires
 /// `fleet-configure`, and `character_id` must be one of the caller's own characters. No ESI
-/// call is made: the fleet and squad IDs are not checked.
+/// call is made: the fleet and squad IDs are not checked. The optional `waitlist_id` links the
+/// fleet to a waitlist (an extension); re-registering without it removes the link. When the
+/// link changes, `waitlist_update` and `status_update` are published for the waitlists
+/// concerned.
 #[utoipa::path(
     post,
     path = "/api/fleet/register",
@@ -273,6 +288,7 @@ struct RegisterRequest {
     responses(
         (status = 200, description = "Registered.", body = String, content_type = "text/plain", example = "OK"),
         (status = 400, description = "`Missing assignment for <category name>` when a configured category has no squad (nothing is saved).", body = String, content_type = "text/plain"),
+        (status = 404, description = "`Waitlist not found` for a `waitlist_id` that is unknown or archived (nothing is saved).", body = String, content_type = "text/plain"),
     ),
 )]
 async fn register_fleet(
@@ -285,8 +301,20 @@ async fn register_fleet(
         .authorize_character(state.db(), input.character_id, None)
         .await?;
     let data = state.data_store()?.get();
+    if let Some(waitlist_id) = input.waitlist_id {
+        crate::routes::waitlist::require_active(state.db(), waitlist_id).await?;
+    }
 
     let mut tx = state.db().begin().await?;
+    let previous_waitlist: Option<i64> =
+        sqlx::query_scalar("SELECT waitlist_id FROM fleet_waitlist WHERE fleet_id = ?")
+            .bind(input.fleet_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    sqlx::query("DELETE FROM fleet_waitlist WHERE fleet_id = ?")
+        .bind(input.fleet_id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM fleet_squad WHERE fleet_id = ?")
         .bind(input.fleet_id)
         .execute(&mut *tx)
@@ -314,7 +342,25 @@ async fn register_fleet(
         .execute(&mut *tx)
         .await?;
     }
+    if let Some(waitlist_id) = input.waitlist_id {
+        sqlx::query("INSERT INTO fleet_waitlist (fleet_id, waitlist_id) VALUES (?, ?)")
+            .bind(input.fleet_id)
+            .bind(waitlist_id)
+            .execute(&mut *tx)
+            .await?;
+    }
     tx.commit().await?;
+
+    // The boss may have changed too, so a linked waitlist's gate changes even when the link
+    // stays the same.
+    let mut changed: Vec<i64> = previous_waitlist
+        .into_iter()
+        .chain(input.waitlist_id)
+        .collect();
+    changed.dedup();
+    for waitlist_id in changed {
+        crate::routes::waitlist::notify::waitlist_update(&state, waitlist_id)?;
+    }
     Ok("OK")
 }
 

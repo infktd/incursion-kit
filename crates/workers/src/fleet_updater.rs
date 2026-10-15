@@ -2,11 +2,15 @@
 //!
 //! Each cycle, per fleet:
 //! 1. A fleet whose boss can't read it any more (no token, missing scope, ESI 403/404) is
-//!    unregistered.
+//!    unregistered: logged, `comp_update` published, and `waitlist_update` / `status_update` for
+//!    the waitlist the fleet was linked to. When ESI rejects the boss's access token (401) before
+//!    it expired, the token is refreshed once and the read retried; a refresh token EVE rejects
+//!    (revoked) or a second 401 unregisters the fleet too, instead of failing every cycle.
 //! 2. Members missing from the `character` table are added (names from ESI).
 //! 3. Pilots who are now in the fleet are removed from the waitlists (an alt x-up removes only
 //!    that character's fits; a main x-up removes the account's non-alt fits), and
-//!    `waitlist_update` is published right away for every waitlist that changed.
+//!    `waitlist_update` (and the public `status_update`) is published right away for every
+//!    waitlist that changed.
 //! 4. `fleet_activity` is updated (only while the fleet has at least `min_in_fleet` members) and
 //!    `comp_update` is published when someone joined, left, or changed hull or boss status.
 
@@ -42,17 +46,12 @@ pub struct FleetUpdater {
 /// What one fleet update did (for logs and tests).
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct FleetUpdate {
-    /// The fleet was unregistered because its boss can't read it.
+    /// The fleet was unregistered because its boss can't read it (or its token is dead).
     pub unregistered: bool,
     /// Waitlists from which pilots now in fleet were removed.
     pub changed_waitlists: Vec<i64>,
     /// Someone joined, left or changed hull/boss status (a `comp_update` was published).
     pub comp_changed: bool,
-}
-
-#[derive(Serialize)]
-struct WaitlistUpdate {
-    waitlist_id: i64,
 }
 
 #[derive(Serialize)]
@@ -117,11 +116,19 @@ impl FleetUpdater {
             return Ok(update); // closed meanwhile
         };
 
-        let members = match self.esi.fleet_members(boss_id, fleet_id).await {
+        let members = match self.read_members(boss_id, fleet_id).await {
             Ok(members) => members,
-            Err(e) if e.is_unusable_character() => {
-                tracing::info!(fleet_id, boss_id, error = %e, "unregistering fleet the boss can no longer read");
-                unregister_fleet(&self.db, fleet_id).await?;
+            Err(e) if e.is_unusable_character() || e.is_unauthorized() => {
+                tracing::warn!(fleet_id, boss_id, error = %e, "unregistering fleet the boss can no longer read");
+                let waitlist_id = unregister_fleet(&self.db, fleet_id).await?;
+                self.publish(
+                    topics::FLEET_COMP,
+                    events::COMP_UPDATE,
+                    &CompUpdate { fleet_id },
+                );
+                if let Some(waitlist_id) = waitlist_id {
+                    self.live.waitlist_changed(waitlist_id);
+                }
                 update.unregistered = true;
                 return Ok(update);
             }
@@ -136,11 +143,7 @@ impl FleetUpdater {
 
         update.changed_waitlists = remove_from_waitlists(&self.db, &member_ids).await?;
         for &waitlist_id in &update.changed_waitlists {
-            self.publish(
-                topics::WAITLIST,
-                events::WAITLIST_UPDATE,
-                &WaitlistUpdate { waitlist_id },
-            );
+            self.live.waitlist_changed(waitlist_id);
         }
 
         let tracked = if members.len() >= self.min_in_fleet {
@@ -157,6 +160,25 @@ impl FleetUpdater {
             );
         }
         Ok(update)
+    }
+
+    /// The fleet's members as its boss sees them. A 401 means ESI rejected an access token we
+    /// still thought valid (revoked, or signed by a key the SSO no longer uses): refresh it once
+    /// and retry, so a token that merely went stale early recovers and a dead one ends in
+    /// `NoToken` (revoked refresh token) or another 401.
+    async fn read_members(
+        &self,
+        boss_id: i64,
+        fleet_id: i64,
+    ) -> wl_esi::EsiResult<Vec<FleetMember>> {
+        match self.esi.fleet_members(boss_id, fleet_id).await {
+            Err(e) if e.is_unauthorized() => {
+                tracing::info!(fleet_id, boss_id, error = %e, "ESI rejected the boss's access token; refreshing it");
+                self.esi.expire_access_token(boss_id).await?;
+                self.esi.fleet_members(boss_id, fleet_id).await
+            }
+            result => result,
+        }
     }
 
     fn publish<T: Serialize>(&self, topic: &str, event: &str, payload: &T) {
@@ -221,9 +243,18 @@ impl FleetUpdater {
     }
 }
 
-/// Forget a fleet registration.
-async fn unregister_fleet(db: &Db, fleet_id: i64) -> Result<()> {
+/// Forget a fleet registration; returns the waitlist it was linked to.
+async fn unregister_fleet(db: &Db, fleet_id: i64) -> Result<Option<i64>> {
     let mut tx = db.begin().await?;
+    let waitlist_id: Option<i64> =
+        sqlx::query_scalar("SELECT waitlist_id FROM fleet_waitlist WHERE fleet_id = ?")
+            .bind(fleet_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    sqlx::query("DELETE FROM fleet_waitlist WHERE fleet_id = ?")
+        .bind(fleet_id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM fleet_squad WHERE fleet_id = ?")
         .bind(fleet_id)
         .execute(&mut *tx)
@@ -233,7 +264,7 @@ async fn unregister_fleet(db: &Db, fleet_id: i64) -> Result<()> {
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
-    Ok(())
+    Ok(waitlist_id)
 }
 
 /// Remove the x-ups of members now in fleet; returns the waitlists that changed.

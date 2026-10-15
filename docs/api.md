@@ -30,7 +30,9 @@ permission, is in the OpenAPI reference.
 - **Ids.** Accounts are identified by their main character's id. Character, corporation,
   alliance and type ids are EVE ids. Times are Unix seconds unless a field says otherwise (the
   incursion tracker uses RFC 3339 strings).
-- **Waitlists.** The schema supports several waitlists; the default one has id `1`.
+- **Waitlists.** There can be several waitlists (one per fleet type, each with its own open state
+  and queue); the default one has id `1`. Administrators manage them with `/api/admin/waitlists`
+  (see [Extensions](#extensions-beyond-the-legacy-api)).
 
 ## Sessions and login
 
@@ -100,9 +102,9 @@ What the keys allow:
 |---|---|
 | `fleet-view` | Fleet status, members and composition; the `fleet_comp` live topic; the FC SRP pages |
 | `fleet-configure` | Registering and closing fleets, MOTD role assignment |
-| `fleet-invite` | Inviting pilots from the waitlist; ESI name search |
+| `fleet-invite` | Inviting pilots from the waitlist and clearing recorded invites; ESI name search |
 | `pilot-view`, `skill-view` | Other pilots' information and skills (everyone sees their own characters) |
-| `waitlist-view`, `fit-view` | Seeing other pilots' entries and their fits on the waitlist |
+| `waitlist-view`, `fit-view` | Seeing other pilots' entries and their fits on the waitlist (also on a closed one, with `include_closed`), their recorded invites, and the list of waitlists |
 | `waitlist-manage` | Approving, rejecting and removing fits |
 | `waitlist-edit` | Opening, closing and emptying the waitlist |
 | `waitlist-tag:TRAINEE`, `waitlist-tag:HQ-FC` | The tag added to the holder's own fits (see `rules.yaml`); `waitlist-tag:HQ-FC` also manages announcements and lists a pilot's linked characters |
@@ -114,7 +116,7 @@ What the keys allow:
 | `stats-view` | Statistics |
 | `commanders-view` | The list of role holders |
 | `commanders-manage`, `commanders-manage:<role>` | Granting and revoking roles; the role-specific key is needed to grant or revoke that role |
-| `commanders-manage:admin` | Site administration: data files, guides and translations, skill plans, SRP administration |
+| `commanders-manage:admin` | Site administration: data files, guides and translations, skill plans, SRP administration, waitlists |
 
 The OpenAPI spec lists the key each operation needs. Missing it gives `401 access denied`.
 
@@ -150,7 +152,7 @@ server's log lines for that request carry the same id.
 
 ## Live events
 
-Two server-sent event (SSE) streams carry live updates. Each event has a name (`event:`) and data
+Three server-sent event (SSE) streams carry live updates. Each event has a name (`event:`) and data
 (`data:`, JSON or plain text). A stream opens with a `: connected` comment, sent at once so that
 proxies which buffer pass the response on immediately; keep-alive comments follow every 15
 seconds.
@@ -159,6 +161,8 @@ seconds.
   `account;<account_id>`, plus `fleet_comp` with `fleet-view`. The topic set is fixed when the
   stream opens; reconnect after a role change.
 - `GET /api/incursions/stream` (public): the topic `incursions`.
+- `GET /api/public/stream` (public): the topics `status` and `incursions` (an extension; a
+  logged-out page needs only this one).
 
 | Topic | Event | Data | Clients |
 |---|---|---|---|
@@ -168,6 +172,13 @@ seconds.
 | `account;<id>` | `wakeup` | plain text, e.g. "… has invited your … to fleet." | notify the pilot |
 | `account;<id>` | `message` | `{"message": "New x-up in waitlist"}` (to fleet bosses) | notify |
 | `incursions` | `incursions_update` | `{"spawn_ids", "changes", "influence_changed"}` | refetch `/api/incursions` |
+| `status` | `status_update` | `{"waitlist_id": 1}` | refetch `/api/public/status` |
+
+`incursions` and `status` are not in the legacy catalogue. `status_update` accompanies every
+`waitlist_update`. `waitlist_update` is also sent where the legacy server was silent (emptying a
+waitlist, an invite or a cleared invite, waitlist administration, fleets registered for a waitlist
+or unregistered): it tells clients that the waitlist, its gate data or its status may have
+changed.
 
 The topic `announcments` and the events `announcment;new` / `announcment;updated` are
 misspelled on purpose: the names are part of the protocol existing frontends use.
@@ -176,6 +187,57 @@ Delivery is best-effort: no persistence, no replay, no event ids. A client that 
 behind is disconnected; browsers' `EventSource` reconnects by itself, and clients should refetch
 what they show when the stream (re)opens. Proxies must not buffer the stream (the backend sends
 `X-Accel-Buffering: no`; Caddy needs no configuration).
+
+## Extensions beyond the legacy API
+
+These add endpoints, optional request fields, response fields and events; legacy clients ignore
+them and nothing they rely on changes. The OpenAPI reference has the full schemas.
+
+**Waitlists as fleet types.** Each waitlist is one fleet type (gate) with its own open state and
+queue.
+
+- `GET /api/waitlists` (`waitlist-view`): `{"waitlists": [{"id", "name", "open", "archived",
+  "waiting"}]}`, archived ones included; `waiting` counts accounts with an x-up.
+- `POST /api/admin/waitlists` `{"name"}` (`commanders-manage:admin`): creates a closed waitlist
+  and answers it (same shape). Names are 1 to 255 characters (`400 Invalid waitlist name`).
+- `PATCH /api/admin/waitlists/{id}` `{"name"?, "archived"?}` (`commanders-manage:admin`): rename,
+  archive or restore; answers the waitlist. Archiving closes the waitlist, removes the entries
+  still on it and unlinks its fleets; a restored waitlist comes back closed. `404 Waitlist not
+  found` for an unknown id.
+- `POST /api/waitlist/set_open` and `POST /api/waitlist/empty` answer `404 Waitlist not found` for
+  an unknown or archived waitlist (see [migrating.md](migrating.md#what-behaves-differently)).
+
+**Gate data.** `POST /api/fleet/register` takes an optional `waitlist_id` (an existing,
+non-archived waitlist, else `404 Waitlist not found`): the fleet serves that waitlist.
+Registering again without it removes the link. `GET /api/fleet/status` lists it per fleet
+(`waitlist_id`, `null` when none).
+
+- `GET /api/waitlist/gates` (any login): `{"gates": [{"id", "name", "open", "waiting", "fcs":
+  [{"id", "name"}], "queued": [{"id", "name", "count"}]}]}` for every non-archived waitlist.
+  `fcs` are the bosses of the fleets registered for it; `queued` has every category (id and name)
+  with the number of fits queued in it. No waiting pilot is named. Refetch on `waitlist_update`.
+
+**Recorded invites.** `POST /api/waitlist/invite` records the invite (who, when) until the fit
+leaves the waitlist, and publishes `waitlist_update`.
+
+- `GET /api/waitlist` has `invited` on each fit: `{"by": {"id", "name"}, "at": <unix seconds>}`
+  (`by` is the inviting account's main) or `null`. It is shown to `waitlist-view` and on the
+  pilot's own fits; others always get `null`.
+- `POST /api/waitlist/invite/clear` `{"id"}` (`fleet-invite`, a fit id): forgets the recorded
+  invite ("undo") and publishes `waitlist_update`; `404 Fit not found` for an unknown fit. It
+  **cannot withdraw the invite in game** (ESI has no call for that): the pilot can still accept it.
+
+**Closed lists for FCs.** `GET /api/waitlist?waitlist_id=<id>&include_closed=true` returns the
+entries of a closed (existing, non-archived) waitlist to `waitlist-view`, with `open: false`.
+Without the parameter, or without the permission, a closed list is `{"open": false, "waitlist":
+null, …}` as before.
+
+**Public status.** For logged-out visitors:
+
+- `GET /api/public/status` (no login, `Cache-Control: public, max-age=10`): `{"waitlists":
+  [{"id", "name", "open", "waiting"}]}` for every non-archived waitlist.
+- `GET /api/public/stream` (no login): `status_update` (`{"waitlist_id"}`, refetch the status)
+  and `incursions_update` events.
 
 ## Health
 

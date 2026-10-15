@@ -3,9 +3,10 @@
 }
 
 :8080 {
-	# API: the backend container when running (profile "backend"), else a backend on the host.
+	# API: the backend container when running (profile "backend"), else a backend on the host
+	# (deploy/dev.sh runs it on 5080: on macOS the AirPlay receiver also answers on 5000).
 	handle /api/* {
-		reverse_proxy backend:5000 host.docker.internal:5000 {
+		reverse_proxy backend:5000 host.docker.internal:5080 {
 			lb_policy first
 			# A request that finds the container missing moves on to the host at once.
 			lb_try_duration 2s

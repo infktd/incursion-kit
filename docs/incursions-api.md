@@ -112,7 +112,9 @@ yet), so their window is unknown.
 ### `GET /api/incursions/stream`
 
 Server-sent events for anonymous clients, on the `incursions` topic only (the authenticated
-`/api/sse/stream` is unchanged and does not carry it). Same framing as the authenticated stream:
+`/api/sse/stream` is unchanged and does not carry it). `GET /api/public/stream` carries the same
+events together with the public waitlist `status_update` (see [api.md](api.md#live-events)), for
+pages that want both on one connection. Same framing as the authenticated stream:
 an opening `: connected` comment, then `event: <name>\ndata: <json>\n\n` plus keep-alive
 comments every 15 seconds; a client that falls behind is
 disconnected and should reconnect and refetch.

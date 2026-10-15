@@ -327,4 +327,5 @@ directory, `WAITLIST_CONFIG` and a restart policy.
 ## Development
 
 `deploy/dev.sh` starts MySQL and Caddy in Docker and runs the backend on the host at
-`http://waitlist.localhost:8080`. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+`http://waitlist.localhost:8080` (the backend itself on `127.0.0.1:5080`; port 5000 stays the
+default for containers and production). See [CONTRIBUTING.md](../CONTRIBUTING.md).

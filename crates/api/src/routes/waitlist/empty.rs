@@ -2,7 +2,8 @@
 //!
 //! - `POST /api/waitlist/empty` `{waitlist_id}` (`waitlist-edit`): deletes every entry and fit of
 //!   a **closed** waitlist (400 `Waitlist must be closed in order to empty it` otherwise). Text
-//!   `OK`. Publishes nothing, like the legacy waitlist.
+//!   `OK`. Publishes `waitlist_update` (the legacy waitlist published nothing). An unknown or
+//!   archived waitlist is a 404 `Waitlist not found` (a 500 in the legacy waitlist).
 
 use axum::extract::State;
 use serde::Deserialize;
@@ -25,7 +26,8 @@ struct EmptyRequest {
 /// Empty a waitlist
 ///
 /// Deletes every entry and fit of a closed waitlist. Requires `waitlist-edit`. Publishes
-/// nothing, like the legacy waitlist. An unknown waitlist ID is a 500 `database error`.
+/// `waitlist_update` and `status_update` (the legacy waitlist published nothing). An unknown or
+/// archived waitlist is a 404 `Waitlist not found`.
 #[utoipa::path(
     post,
     path = "/api/waitlist/empty",
@@ -36,6 +38,7 @@ struct EmptyRequest {
     responses(
         (status = 200, description = "Done.", body = String, content_type = "text/plain", example = "OK"),
         (status = 400, description = "`Waitlist must be closed in order to empty it`.", body = String, content_type = "text/plain"),
+        (status = 404, description = "`Waitlist not found` (unknown or archived).", body = String, content_type = "text/plain"),
     ),
 )]
 async fn empty(
@@ -44,6 +47,7 @@ async fn empty(
     JsonBody(input): JsonBody<EmptyRequest>,
 ) -> ApiResult<&'static str> {
     account.require_access("waitlist-edit")?;
+    super::require_active(state.db(), input.waitlist_id).await?;
     let is_open: i8 = sqlx::query_scalar("SELECT is_open FROM waitlist WHERE id = ?")
         .bind(input.waitlist_id)
         .fetch_one(state.db())
@@ -67,5 +71,6 @@ async fn empty(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
+    super::notify::waitlist_update(&state, input.waitlist_id)?;
     Ok("OK")
 }

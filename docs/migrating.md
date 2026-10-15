@@ -130,6 +130,19 @@ Everything the frontend relies on is unchanged. These are the intentional differ
   payloads are unchanged, misspellings included.
 - The x-up notification (`message`, "New x-up in waitlist") goes to the fleet boss's *account*.
   The old server addressed the boss character, which nobody received when the boss was an alt.
+- `waitlist_update` is also sent where the old server was silent: after `POST /api/waitlist/empty`
+  and `POST /api/waitlist/invite`, when a fleet registered for a waitlist is registered again or
+  unregistered, and for the new waitlist administration. Old frontends just refetch.
+
+**Waitlists**
+
+- `POST /api/waitlist/set_open` and `POST /api/waitlist/empty` answer `404 Waitlist not found`
+  for a waitlist that doesn't exist or is archived. The old server answered `set_open` with `OK`
+  and changed nothing, and `empty` with `500 database error`. This is the only change to an
+  existing endpoint's answer for a valid request.
+- The fleet updater unregisters a fleet whose boss's access token ESI rejects (401) and can't be
+  refreshed (or is rejected again after a refresh), like one whose boss has no token or scope.
+  The old server kept retrying such a fleet forever.
 
 **Data files**
 
@@ -166,5 +179,8 @@ Everything the frontend relies on is unchanged. These are the intentional differ
 - `GET /api/commanders/roles` lists the roles you may grant in role order, lowest first.
 
 **Additions** (nothing existing changed): the public incursion tracker (`/api/incursions*`,
-[incursions-api.md](incursions-api.md)), the API reference (`/api/docs`, `/api/openapi.json`) and
-`GET /healthz`.
+[incursions-api.md](incursions-api.md)), the API reference (`/api/docs`, `/api/openapi.json`),
+`GET /healthz`, and the waitlist extensions listed in [api.md](api.md#extensions-beyond-the-legacy-api):
+waitlist administration, gate data, recorded invites, closed lists for FCs and the public status.
+They add two tables (`fleet_waitlist`, `waitlist_invite`, migration 3); the old tables are
+unchanged.

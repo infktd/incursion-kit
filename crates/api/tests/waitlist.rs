@@ -550,7 +550,7 @@ async fn remove_fit_and_remove_x() {
 }
 
 #[tokio::test]
-async fn empty_needs_a_closed_list_and_is_silent() {
+async fn empty_needs_a_closed_list_and_notifies() {
     let Some(env) = Env::new().await else { return };
     env.open_waitlist().await;
     let pilot = env.pilot(1001, None).await;
@@ -578,7 +578,12 @@ async fn empty_needs_a_closed_list_and_is_silent() {
     let mut sub = env.live().subscribe(vec![topics::WAITLIST.into()]);
     let res = env.post_json("/api/waitlist/empty", Some(&fc), &body).await;
     assert_eq!((res.status, res.text()), (StatusCode::OK, "OK"));
-    no_event(&mut sub).await;
+    // The legacy waitlist published nothing here; the update is additive.
+    let event = next_event(&mut sub).await;
+    assert_eq!(
+        (event.name.as_str(), event.data.as_str()),
+        (events::WAITLIST_UPDATE, r#"{"waitlist_id":1}"#)
+    );
     assert_eq!(count(&env, "waitlist_entry").await, 0);
     assert_eq!(count(&env, "waitlist_entry_fit").await, 0);
 }
@@ -658,8 +663,15 @@ async fn invite_uses_the_category_squad_and_wakes_the_pilot() {
     assert_eq!(wakeup.topic, "account;1001");
     assert_eq!(wakeup.name, events::WAKEUP);
     assert_eq!(wakeup.data, "Pilot 2001 has invited your Paladin to fleet.");
-    no_event(&mut sub).await; // no waitlist_update
+    // Additive: the invite is recorded and announced with `waitlist_update`.
+    let update = next_event(&mut sub).await;
+    assert_eq!(
+        (update.name.as_str(), update.data.as_str()),
+        (events::WAITLIST_UPDATE, r#"{"waitlist_id":1}"#)
+    );
+    no_event(&mut sub).await;
     assert_eq!(count(&env, "waitlist_entry_fit").await, 1);
+    assert_eq!(count(&env, "waitlist_invite").await, 1);
 
     // Alt x-ups go to the `alt` squad; ESI refusals keep their status.
     sqlx::query("UPDATE waitlist_entry_fit SET is_alt = 1")

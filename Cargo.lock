@@ -4166,6 +4166,7 @@ dependencies = [
 name = "wl-workers"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "chrono",
  "futures",
  "rand 0.10.3",

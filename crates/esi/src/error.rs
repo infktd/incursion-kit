@@ -79,6 +79,12 @@ pub trait EsiErrorExt {
         self.esi_status() == Some(404)
     }
 
+    /// Whether ESI answered 401: it rejected the access token (revoked or invalid) although the
+    /// stored one had not expired yet.
+    fn is_unauthorized(&self) -> bool {
+        self.esi_status() == Some(401)
+    }
+
     /// Whether the character can't be acted for: no stored token, the token lacks the scope, or
     /// ESI refused (403) or didn't find (404) what was asked. The fleet updater drops a fleet
     /// whose boss hits one of these.
@@ -137,5 +143,8 @@ mod tests {
         assert!(EsiError::WithMessage(403, String::new()).is_unusable_character());
         assert!(!EsiError::WithMessage(500, String::new()).is_unusable_character());
         assert!(!EsiError::Http("x".into()).is_unusable_character());
+        assert!(EsiError::WithMessage(401, String::new()).is_unauthorized());
+        assert!(!EsiError::WithMessage(401, String::new()).is_unusable_character());
+        assert!(!EsiError::NoToken.is_unauthorized());
     }
 }

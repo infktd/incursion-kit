@@ -39,6 +39,9 @@ pub mod topics {
     /// Incursion tracker changes, for everyone (served on the public `/api/incursions/stream`,
     /// not on the authenticated stream). Not part of the legacy catalogue.
     pub const INCURSIONS: &str = "incursions";
+    /// Public waitlist status changes, for everyone (served on the public `/api/public/stream`,
+    /// not on the authenticated stream). Not part of the legacy catalogue.
+    pub const STATUS: &str = "status";
 
     /// The per-account topic: `account;<account_id>` (account id = main character id).
     pub fn account(account_id: i64) -> String {
@@ -63,6 +66,9 @@ pub mod events {
     /// On [`super::topics::INCURSIONS`]: JSON `{"spawn_ids": [i64], "changes": [...],
     /// "influence_changed": [i64]}`; clients refetch `/api/incursions`.
     pub const INCURSIONS_UPDATE: &str = "incursions_update";
+    /// On [`super::topics::STATUS`]: JSON `{"waitlist_id": i64}`; clients refetch
+    /// `/api/public/status`.
+    pub const STATUS_UPDATE: &str = "status_update";
 }
 
 /// One published event, shared between all subscribers that receive it.
@@ -236,6 +242,15 @@ impl Hub {
         Ok(())
     }
 
+    /// A waitlist changed (entries, open state, name, linked fleets): `waitlist_update` on
+    /// [`topics::WAITLIST`] and `status_update` on [`topics::STATUS`], both with the JSON data
+    /// `{"waitlist_id": <id>}`.
+    pub fn waitlist_changed(&self, waitlist_id: i64) {
+        let data = format!("{{\"waitlist_id\":{waitlist_id}}}");
+        self.publish(topics::WAITLIST, events::WAITLIST_UPDATE, data.clone());
+        self.publish(topics::STATUS, events::STATUS_UPDATE, data);
+    }
+
     /// Number of currently connected subscribers.
     pub fn subscriber_count(&self) -> usize {
         self.inner.registry().subscribers.len()
@@ -298,6 +313,39 @@ mod tests {
         tokio::time::timeout(Duration::from_secs(1), sub.next())
             .await
             .expect("timed out waiting for event")
+    }
+
+    #[tokio::test]
+    async fn waitlist_changed_reaches_both_topics() {
+        let hub = Hub::new();
+        let mut sub = hub.subscribe(t(&[topics::WAITLIST, topics::STATUS]));
+        hub.waitlist_changed(3);
+        let first = next(&mut sub).await.unwrap();
+        assert_eq!(
+            (
+                first.topic.as_str(),
+                first.name.as_str(),
+                first.data.as_str()
+            ),
+            (
+                topics::WAITLIST,
+                events::WAITLIST_UPDATE,
+                r#"{"waitlist_id":3}"#
+            )
+        );
+        let second = next(&mut sub).await.unwrap();
+        assert_eq!(
+            (
+                second.topic.as_str(),
+                second.name.as_str(),
+                second.data.as_str()
+            ),
+            (
+                topics::STATUS,
+                events::STATUS_UPDATE,
+                r#"{"waitlist_id":3}"#
+            )
+        );
     }
 
     #[tokio::test]

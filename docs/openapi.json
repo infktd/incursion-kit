@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "incursion-kit waitlist API",
-    "description": "The HTTP API of the incursion-kit waitlist server. It is wire-compatible with the legacy\ncommunity waitlist, so existing frontends keep working.\n\n- **Authentication**: the `authToken` session cookie, set by `POST /api/auth/cb` after an EVE SSO\n  login (`GET /api/auth/login_url`). Operations that need a login list the `session` scheme;\n  its scopes are the permission keys the operation requires.\n- **Errors** are plain text (`text/plain`), not JSON: `401 Authorization Required` without a\n  session, `access denied` without a permission, `404 Not Found` for unknown paths, unsupported\n  methods and malformed parameters.\n- **Request bodies** are JSON; the `Content-Type` header is optional.\n- **Live events** are server-sent events: `GET /api/sse/stream` (logged in) and\n  `GET /api/incursions/stream` (public).\n\nThe guide to the API (sessions, roles and permission keys, live event topics) is `docs/api.md`\nin the repository.\n",
+    "description": "The HTTP API of the incursion-kit waitlist server. It is wire-compatible with the legacy\ncommunity waitlist, so existing frontends keep working.\n\n- **Authentication**: the `authToken` session cookie, set by `POST /api/auth/cb` after an EVE SSO\n  login (`GET /api/auth/login_url`). Operations that need a login list the `session` scheme;\n  its scopes are the permission keys the operation requires.\n- **Errors** are plain text (`text/plain`), not JSON: `401 Authorization Required` without a\n  session, `access denied` without a permission, `404 Not Found` for unknown paths, unsupported\n  methods and malformed parameters.\n- **Request bodies** are JSON; the `Content-Type` header is optional.\n- **Live events** are server-sent events: `GET /api/sse/stream` (logged in),\n  `GET /api/incursions/stream` (public) and `GET /api/public/stream` (public: waitlist status and\n  incursions).\n- **Extensions** beyond the legacy API (waitlist administration, gates, recorded invites, public\n  status) say so in their descriptions; they add endpoints and fields without changing existing\n  ones.\n\nThe guide to the API (sessions, roles and permission keys, live event topics) is `docs/api.md`\nin the repository.\n",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -2674,6 +2674,186 @@
         ]
       }
     },
+    "/api/admin/waitlists": {
+      "post": {
+        "tags": [
+          "waitlist"
+        ],
+        "summary": "Create a waitlist",
+        "description": "Adds a waitlist (a fleet type with its own queue), closed. Requires\n`commanders-manage:admin`. Publishes `waitlist_update` and `status_update` for it. An\nextension beyond the legacy API.",
+        "operationId": "create_waitlist",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWaitlistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new waitlist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitlistInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`Invalid waitlist name`.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid JSON body: …` when the body doesn't match the schema.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [
+              "commanders-manage:admin"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/admin/waitlists/{id}": {
+      "patch": {
+        "tags": [
+          "waitlist"
+        ],
+        "summary": "Rename, archive or restore a waitlist",
+        "description": "Changes the fields given. Archiving closes the waitlist, removes every entry still on it and\nunlinks the fleets registered for it; a restored waitlist comes back closed. Requires\n`commanders-manage:admin`. Publishes `waitlist_update` and `status_update` for the\nwaitlist. An extension beyond the legacy API.",
+        "operationId": "update_waitlist",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Waitlist ID.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWaitlistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The updated waitlist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitlistInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`Invalid waitlist name`.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`Waitlist not found`.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid JSON body: …` when the body doesn't match the schema.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [
+              "commanders-manage:admin"
+            ]
+          }
+        ]
+      }
+    },
     "/api/auth/cb": {
       "get": {
         "tags": [
@@ -4364,7 +4544,7 @@
           "fleet"
         ],
         "summary": "Register a fleet",
-        "description": "Makes `character_id` the boss of `fleet_id` and stores which squad each waitlist category\nis invited into, replacing any previous registration of the fleet. Requires\n`fleet-configure`, and `character_id` must be one of the caller's own characters. No ESI\ncall is made: the fleet and squad IDs are not checked.",
+        "description": "Makes `character_id` the boss of `fleet_id` and stores which squad each waitlist category\nis invited into, replacing any previous registration of the fleet. Requires\n`fleet-configure`, and `character_id` must be one of the caller's own characters. No ESI\ncall is made: the fleet and squad IDs are not checked. The optional `waitlist_id` links the\nfleet to a waitlist (an extension); re-registering without it removes the link. When the\nlink changes, `waitlist_update` and `status_update` are published for the waitlists\nconcerned.",
         "operationId": "register_fleet",
         "requestBody": {
           "content": {
@@ -4400,6 +4580,16 @@
           },
           "401": {
             "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`Waitlist not found` for a `waitlist_id` that is unknown or archived (nothing is saved).",
             "content": {
               "text/plain": {
                 "schema": {
@@ -4444,7 +4634,7 @@
           "fleet"
         ],
         "summary": "Registered fleets",
-        "description": "Every fleet registered with `POST /api/fleet/register`, with the boss that registered it.\nRequires `fleet-view`. Reads only the database (no ESI call), so a fleet that has since\nclosed stays listed until the fleet updater drops it.",
+        "description": "Every fleet registered with `POST /api/fleet/register`, with the boss that registered it\nand the waitlist it was registered for (`waitlist_id`, an extension). Requires `fleet-view`. Reads only the database (no ESI call), so a fleet that has since\nclosed stays listed until the fleet updater drops it.",
         "operationId": "fleet_status",
         "responses": {
           "200": {
@@ -5918,6 +6108,70 @@
         ]
       }
     },
+    "/api/public/status": {
+      "get": {
+        "tags": [
+          "waitlist"
+        ],
+        "summary": "Public waitlist status",
+        "description": "For every non-archived waitlist: its name, whether it is open and how many accounts are\nwaiting. No login needed; the answer may be cached for 10 seconds\n(`Cache-Control: public, max-age=10`). Clients refetch on `status_update` from\n`GET /api/public/stream`. An extension beyond the legacy API.",
+        "operationId": "public_status",
+        "responses": {
+          "200": {
+            "description": "The waitlists' status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/stream": {
+      "get": {
+        "tags": [
+          "live"
+        ],
+        "summary": "Public events",
+        "description": "A public server-sent event stream of the `status` topic (`status_update`, JSON\n`{\"waitlist_id\": …}`, whenever a waitlist's status may have changed: refetch\n`GET /api/public/status`) and the `incursions` topic (`incursions_update`, as on\n`GET /api/incursions/stream`). The stream opens with a `: connected` comment; keep-alive\ncomments follow every 15 seconds. An extension beyond the legacy API.",
+        "operationId": "public_stream",
+        "responses": {
+          "200": {
+            "description": "The event stream.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "tags": [
@@ -7278,7 +7532,7 @@
           "waitlist"
         ],
         "summary": "The waitlist",
-        "description": "A waitlist's entries with their fits. Any logged-in account may call it; what each entry\nshows depends on the viewer, as in the legacy waitlist (see the field descriptions): the\nown entry (or `waitlist-view`) shows the characters, hours in fleet, review comment, x-up\nmessage and all tags; DNA, implants and fit analysis need the own entry or `waitlist-view`\nand `fit-view`; `can_remove` is set for the own entry or with `waitlist-manage`; pinned\npilot notes need `waitlist-view`. A hull missing from the static data is a 400 `type error:\n…`, as in the legacy waitlist.",
+        "description": "A waitlist's entries with their fits. Any logged-in account may call it; what each entry\nshows depends on the viewer, as in the legacy waitlist (see the field descriptions): the\nown entry (or `waitlist-view`) shows the characters, hours in fleet, review comment, x-up\nmessage and all tags; DNA, implants and fit analysis need the own entry or `waitlist-view`\nand `fit-view`; `can_remove` is set for the own entry or with `waitlist-manage`; pinned\npilot notes need `waitlist-view`; the recorded invite (`invited`) needs the own entry or\n`waitlist-view`. With `include_closed=true`, `waitlist-view` also gets the entries of a\nclosed waitlist (`open` stays `false`); the default is the legacy behaviour. A hull missing from the static data is a 400 `type error:\n…`, as in the legacy waitlist.",
         "operationId": "get_waitlist",
         "parameters": [
           {
@@ -7288,6 +7542,15 @@
             "schema": {
               "type": "integer",
               "format": "int64"
+            }
+          },
+          {
+            "name": "include_closed",
+            "in": "query",
+            "description": "With `waitlist-view`: return the entries of a closed waitlist too (`open` stays\n`false`). Ignored without the permission and for unknown or archived waitlists. An\nextension beyond the legacy API.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -7416,7 +7679,7 @@
           "waitlist"
         ],
         "summary": "Empty a waitlist",
-        "description": "Deletes every entry and fit of a closed waitlist. Requires `waitlist-edit`. Publishes\nnothing, like the legacy waitlist. An unknown waitlist ID is a 500 `database error`.",
+        "description": "Deletes every entry and fit of a closed waitlist. Requires `waitlist-edit`. Publishes\n`waitlist_update` and `status_update` (the legacy waitlist published nothing). An unknown or\narchived waitlist is a 404 `Waitlist not found`.",
         "operationId": "empty_waitlist",
         "requestBody": {
           "content": {
@@ -7460,6 +7723,16 @@
               }
             }
           },
+          "404": {
+            "description": "`Waitlist not found` (unknown or archived).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`invalid JSON body: …` when the body doesn't match the schema.",
             "content": {
@@ -7490,13 +7763,60 @@
         ]
       }
     },
+    "/api/waitlist/gates": {
+      "get": {
+        "tags": [
+          "waitlist"
+        ],
+        "summary": "Gates (waitlist overview)",
+        "description": "For every non-archived waitlist: its name, whether it is open, how many accounts are\nwaiting, the bosses of the fleets registered for it, and the number of fits queued per\ncategory. Any logged-in account may call it; it names no waiting pilot. Clients refetch on\n`waitlist_update`. An extension beyond the legacy API.",
+        "operationId": "waitlist_gates",
+        "responses": {
+          "200": {
+            "description": "The gates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/waitlist/invite": {
       "post": {
         "tags": [
           "waitlist"
         ],
         "summary": "Invite a pilot to fleet",
-        "description": "Invites the fit's pilot into the squad that the fleet bossed by `character_id` registered\nfor the fit's category (the `alt` category's squad for alt x-ups), via ESI as\n`character_id` (`esi-fleets.write_fleet.v1`). Requires `fleet-invite`, and `character_id`\nmust be one of the caller's own characters. The waitlist is not changed: the fit leaves it\nwhen the fleet updater sees the pilot in fleet. Publishes `wakeup` (plain text `<FC> has\ninvited your <hull> to fleet.`, naming the caller's main) on the x-up account's topic; no\n`waitlist_update`. ESI failures are passed on with ESI's status as `ESI error: <reason>`\n(e.g. `ESI error: Character is already in a fleet`). An unknown fit ID is a 500 `database\nerror`.",
+        "description": "Invites the fit's pilot into the squad that the fleet bossed by `character_id` registered\nfor the fit's category (the `alt` category's squad for alt x-ups), via ESI as\n`character_id` (`esi-fleets.write_fleet.v1`). Requires `fleet-invite`, and `character_id`\nmust be one of the caller's own characters. The fit stays on the waitlist until the fleet\nupdater sees the pilot in fleet; the invite is recorded and shown as `invited` (`{by, at}`,\n`by` being the caller's main) on the fit in `GET /api/waitlist` (an extension beyond the\nlegacy API). Publishes `wakeup` (plain text `<FC> has invited your <hull> to fleet.`, naming\nthe caller's main) on the x-up account's topic, then `waitlist_update` on `waitlist` (the\nlegacy waitlist published no `waitlist_update` here). ESI failures are passed on with ESI's status as `ESI error: <reason>`\n(e.g. `ESI error: Character is already in a fleet`). An unknown fit ID is a 500 `database\nerror`.",
         "operationId": "invite_to_fleet",
         "requestBody": {
           "content": {
@@ -7532,6 +7852,86 @@
           },
           "401": {
             "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid JSON body: …` when the body doesn't match the schema.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [
+              "fleet-invite"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/waitlist/invite/clear": {
+      "post": {
+        "tags": [
+          "waitlist"
+        ],
+        "summary": "Clear a recorded invite",
+        "description": "Forgets the invite recorded for a fit, so `invited` is `null` again (\"undo\" in a frontend).\nIt does **not** withdraw the invite in game (ESI has no call for that): the pilot can still\naccept it. Requires `fleet-invite`. Publishes `waitlist_update` on `waitlist`. Clearing a\nfit without a recorded invite is not an error. An extension beyond the legacy API.",
+        "operationId": "clear_invite",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Cleared.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "OK"
+              }
+            }
+          },
+          "401": {
+            "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`Fit not found`.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7782,7 +8182,7 @@
           "waitlist"
         ],
         "summary": "Open or close a waitlist",
-        "description": "Sets whether pilots can x-up (closing keeps the entries). Requires `waitlist-edit`.\nPublishes `waitlist_update` (`{\"waitlist_id\": …}`) on `waitlist`. An unknown waitlist ID is\nnot an error.",
+        "description": "Sets whether pilots can x-up (closing keeps the entries). Requires `waitlist-edit`.\nPublishes `waitlist_update` (`{\"waitlist_id\": …}`) on `waitlist` (and `status_update` on the\npublic `status` topic). An unknown or archived waitlist is a 404 `Waitlist not found`.",
         "operationId": "set_waitlist_open",
         "requestBody": {
           "content": {
@@ -7808,6 +8208,16 @@
           },
           "401": {
             "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`Waitlist not found` (unknown or archived).",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7919,6 +8329,55 @@
         "security": [
           {
             "session": []
+          }
+        ]
+      }
+    },
+    "/api/waitlists": {
+      "get": {
+        "tags": [
+          "waitlist"
+        ],
+        "summary": "List waitlists",
+        "description": "Every waitlist (fleet type) with its open state, whether it is archived and how many\naccounts are waiting. Requires `waitlist-view`. An extension beyond the legacy API.",
+        "operationId": "list_waitlists",
+        "responses": {
+          "200": {
+            "description": "The waitlists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitlistsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`database error`, `internal error` or `ESI error: …` (details are logged).",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [
+              "waitlist-view"
+            ]
           }
         ]
       }
@@ -8536,6 +8995,19 @@
           }
         }
       },
+      "ClearInviteRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The fit's x-up ID (`fits[].id` in `GET /api/waitlist`)."
+          }
+        }
+      },
       "CloseRequest": {
         "type": "object",
         "required": [
@@ -8723,6 +9195,18 @@
               "null"
             ],
             "description": "`YYYY-MM-DD HH:MM UTC`."
+          }
+        }
+      },
+      "CreateWaitlistRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "1 to 255 characters (surrounding whitespace is trimmed)."
           }
         }
       },
@@ -9737,6 +10221,14 @@
             "type": "integer",
             "format": "int64",
             "description": "ESI fleet ID."
+          },
+          "waitlist_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The waitlist the fleet was registered for (`waitlist_id` of `POST /api/fleet/register`),\n`null` if none. An extension beyond the legacy API."
           }
         }
       },
@@ -9823,6 +10315,65 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "Gate": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "open",
+          "waiting",
+          "fcs",
+          "queued"
+        ],
+        "properties": {
+          "fcs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Character"
+            },
+            "description": "The bosses of the fleets registered for this waitlist, by fleet registration\n(`corporation_id` is always absent). Empty when no fleet is linked."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Waitlist ID."
+          },
+          "name": {
+            "type": "string"
+          },
+          "open": {
+            "type": "boolean",
+            "description": "Whether pilots can x-up."
+          },
+          "queued": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueuedCount"
+            },
+            "description": "Fits queued per waitlist category, in configured order (every category, zeros\nincluded)."
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Accounts with an x-up on the waitlist."
+          }
+        }
+      },
+      "GatesResponse": {
+        "type": "object",
+        "required": [
+          "gates"
+        ],
+        "properties": {
+          "gates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Gate"
+            },
+            "description": "Every non-archived waitlist, by ID."
           }
         }
       },
@@ -10137,6 +10688,25 @@
             "type": "integer",
             "format": "int64",
             "description": "The fit's x-up ID (`fits[].id` in `GET /api/waitlist`)."
+          }
+        }
+      },
+      "Invited": {
+        "type": "object",
+        "description": "A recorded fleet invite.",
+        "required": [
+          "by",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the invite was sent (Unix seconds)."
+          },
+          "by": {
+            "$ref": "#/components/schemas/Character",
+            "description": "The inviting account's main (`corporation_id` is always absent)."
           }
         }
       },
@@ -10636,6 +11206,72 @@
           }
         }
       },
+      "PublicStatus": {
+        "type": "object",
+        "required": [
+          "waitlists"
+        ],
+        "properties": {
+          "waitlists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicWaitlist"
+            },
+            "description": "Every non-archived waitlist, by ID."
+          }
+        }
+      },
+      "PublicWaitlist": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "open",
+          "waiting"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Waitlist ID."
+          },
+          "name": {
+            "type": "string"
+          },
+          "open": {
+            "type": "boolean",
+            "description": "Whether pilots can x-up."
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Accounts with an x-up on the waitlist."
+          }
+        }
+      },
+      "QueuedCount": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Fits in this category on the waitlist."
+          },
+          "id": {
+            "type": "string",
+            "description": "Category ID (`categories.yaml`; the keys of fleet registration `assignments`)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Category name (as in `GET /api/waitlist`)."
+          }
+        }
+      },
       "ReferenceJumps": {
         "type": "object",
         "required": [
@@ -10729,6 +11365,14 @@
             "type": "integer",
             "format": "int64",
             "description": "ESI fleet ID."
+          },
+          "waitlist_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The waitlist (fleet type) this fleet serves: its boss is shown as that waitlist's FC in\n`GET /api/waitlist/gates`. Must be an existing, non-archived waitlist. Omitted: the\nfleet is linked to none. An extension beyond the legacy API."
           }
         }
       },
@@ -12052,6 +12696,25 @@
           }
         }
       },
+      "UpdateWaitlistRequest": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "`true` archives the waitlist (closing it, removing its entries and unlinking its\nfleets); `false` restores an archived one, closed."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "New name: 1 to 255 characters (surrounding whitespace is trimmed)."
+          }
+        }
+      },
       "UploadGuideAssetResponse": {
         "type": "object",
         "required": [
@@ -12210,6 +12873,17 @@
             },
             "description": "The pilot's implant type IDs. Own entry or `waitlist-view` + `fit-view` only."
           },
+          "invited": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Invited",
+                "description": "The last fleet invite sent for this fit (`POST /api/waitlist/invite`), until the fit\nleaves the waitlist or the invite is cleared. Own entry or `waitlist-view` only; `null`\notherwise. An extension beyond the legacy API."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "is_alt": {
             "type": "boolean"
           },
@@ -12233,6 +12907,40 @@
               "type": "string"
             },
             "description": "All tags for the own entry or with `waitlist-view`; otherwise only the public tags."
+          }
+        }
+      },
+      "WaitlistInfo": {
+        "type": "object",
+        "description": "A waitlist (fleet type).",
+        "required": [
+          "id",
+          "name",
+          "open",
+          "archived",
+          "waiting"
+        ],
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Archived waitlists are hidden from the gate and status views and can't be opened."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Waitlist ID (`waitlist_id` everywhere else)."
+          },
+          "name": {
+            "type": "string"
+          },
+          "open": {
+            "type": "boolean",
+            "description": "Whether pilots can x-up."
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Accounts with an x-up on the waitlist."
           }
         }
       },
@@ -12262,7 +12970,22 @@
             "items": {
               "$ref": "#/components/schemas/WaitlistEntry"
             },
-            "description": "The entries in join order; `null` when the waitlist is closed or doesn't exist."
+            "description": "The entries in join order; `null` when the waitlist is closed (unless `include_closed`)\nor doesn't exist."
+          }
+        }
+      },
+      "WaitlistsResponse": {
+        "type": "object",
+        "required": [
+          "waitlists"
+        ],
+        "properties": {
+          "waitlists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WaitlistInfo"
+            },
+            "description": "Every waitlist by ID, archived ones included."
           }
         }
       },

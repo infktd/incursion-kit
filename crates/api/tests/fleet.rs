@@ -114,7 +114,7 @@ async fn status_lists_registered_fleets_for_fleet_viewers() {
     assert_eq!(res.status, 200);
     assert_eq!(
         res.json::<Value>(),
-        json!({"fleets": [{"id": FLEET, "boss": {"id": FC, "name": "Pilot 1001"}}]})
+        json!({"fleets": [{"id": FLEET, "boss": {"id": FC, "name": "Pilot 1001"}, "waitlist_id": null}]})
     );
 }
 

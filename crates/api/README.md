@@ -131,7 +131,9 @@ To publish, use `state.live()`:
 ```rust
 use wl_live::{events, topics};
 
-state.live().publish_json(topics::WAITLIST, events::WAITLIST_UPDATE, &json!({"waitlist_id": id}))
+// A waitlist changed: `waitlist_update` + the public `status_update` (routes/waitlist/notify.rs).
+state.live().waitlist_changed(waitlist_id);
+state.live().publish_json(topics::FLEET_COMP, events::COMP_UPDATE, &json!({"fleet_id": id}))
     .map_err(ApiError::internal)?;
 state.live().publish(&topics::account(account_id), events::WAKEUP, text);   // plain-text data
 ```
@@ -140,9 +142,13 @@ state.live().publish(&topics::account(account_id), events::WAKEUP, text);   // p
   `docs/api.md` ("Live events"), including the misspelled `announcments` topic and the
   `announcment;new` / `announcment;updated` events. Use the constants in `wl_live::topics` and
   `wl_live::events`.
-- **Additive topics.** The `incursions` topic (`incursions_update`) is not in the legacy
-  catalogue. It is served to anonymous clients on `GET /api/incursions/stream` and not on the
-  authenticated stream (`routes/incursions.rs`, `docs/incursions-api.md`).
+- **Additive topics.** The `incursions` topic (`incursions_update`) and the `status` topic
+  (`status_update`) are not in the legacy catalogue. They are served to anonymous clients
+  (`incursions` on `GET /api/incursions/stream`, both on `GET /api/public/stream`) and not on the
+  authenticated stream (`routes/incursions.rs`, `routes/public.rs`, `docs/incursions-api.md`).
+- **Extensions.** New endpoints and fields beyond the legacy API say so in their doc comments
+  and are listed in `docs/api.md` ("Extensions beyond the legacy API"). Legacy behaviour stays
+  the default; an opt-in goes in a new optional parameter or field.
 - **Publishing never blocks.** A subscriber whose buffer is full is disconnected. Its browser then
   reconnects and refetches.
 

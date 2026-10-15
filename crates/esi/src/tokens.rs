@@ -223,6 +223,16 @@ impl TokenStore {
         tx.commit().await.map_err(error::db)
     }
 
+    /// Mark the stored access token as expired, so the next call refreshes it.
+    pub async fn expire(&self, character_id: i64) -> EsiResult<()> {
+        sqlx::query("UPDATE access_token SET expires = 0 WHERE character_id = ?")
+            .bind(character_id)
+            .execute(&self.db)
+            .await
+            .map_err(error::db)?;
+        Ok(())
+    }
+
     async fn delete(&self, character_id: i64) -> EsiResult<()> {
         let mut tx = self.db.begin().await.map_err(error::db)?;
         for query in [
@@ -251,6 +261,13 @@ impl Esi {
     /// The scopes granted to `character_id`'s stored token (refreshing it if expired).
     pub async fn granted_scopes(&self, character_id: i64) -> EsiResult<BTreeSet<String>> {
         Ok(self.inner.tokens.access_token_raw(character_id).await?.1)
+    }
+
+    /// Forget `character_id`'s current access token, so the next call refreshes it first: for a
+    /// token ESI rejected (401) before it expired. A refresh token EVE has revoked then turns
+    /// the next call into [`EsiError::NoToken`].
+    pub async fn expire_access_token(&self, character_id: i64) -> EsiResult<()> {
+        self.inner.tokens.expire(character_id).await
     }
 
     /// Whether a refresh token is stored for `character_id` (without contacting EVE).

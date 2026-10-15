@@ -14,13 +14,17 @@ deploy/dev.sh
 
 starts MySQL (on `127.0.0.1:3307`, root password `root`) and Caddy (on
 `http://waitlist.localhost:8080`) in Docker, writes a development `config.toml` on first run and
-runs the backend on the host with `cargo run`. Put the id and secret of an ESI test application
+runs the backend on the host with `cargo run`, on `127.0.0.1:5080` (where Caddy looks for it;
+the script sets `WAITLIST__SERVER__BIND`, so an older `config.toml` with port 5000 still works).
+The production default, 5000, is avoided because on macOS the AirPlay receiver answers on it too,
+and Caddy would keep proxying to AirPlay after a backend restart. Put the id and secret of an ESI test application
 (callback `http://waitlist.localhost:8080/auth/cb`) into `config.toml` to log in. Your frontend's
 dev server runs separately on port 4321; Caddy sends everything except `/api/*` to it. The API
 reference is at `http://waitlist.localhost:8080/api/docs`.
 
 Without the script: `docker compose -f deploy/compose.yaml up -d mysql caddy`, then
-`cargo run -p waitlist` with a `config.toml` (see [docs/deploy.md](docs/deploy.md#configuration)).
+`cargo run -p waitlist` with a `config.toml` binding `127.0.0.1:5080` (see
+[docs/deploy.md](docs/deploy.md#configuration)).
 
 ## Develop a frontend without a CCP account
 

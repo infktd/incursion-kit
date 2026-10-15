@@ -19,6 +19,7 @@ mod locales;
 mod modules;
 mod notes;
 mod pilot;
+mod public;
 mod search;
 mod skillplans;
 mod skills;
@@ -70,4 +71,5 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .merge(srp::routes())
         .merge(fittings::routes())
         .merge(incursions::routes())
+        .merge(public::routes())
 }

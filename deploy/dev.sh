@@ -11,6 +11,10 @@
 # with the example data set, and the static data file deploy/sde/sde.sqlite is built if missing.
 # Your frontend's dev server runs separately on port 4321; Caddy proxies everything but /api to it.
 #
+# The backend listens on 127.0.0.1:5080 (WAITLIST__SERVER__BIND overrides config.toml's bind),
+# where Caddy expects it. Not 5000, the production default: on macOS the AirPlay receiver also
+# answers on 5000, and Caddy would keep proxying to it after a backend restart.
+#
 # With --dev-esi the backend's ESI settings come from the environment (config.toml is left as it
 # is), dev-esi's characters get their waitlist roles and bans, and dev-esi's login page and
 # dashboard are under http://waitlist.localhost:8080/dev-esi/ (dashboard: /dev-esi/_dev). Its
@@ -49,7 +53,7 @@ client_secret = "replace-me"
 url = "http://waitlist.localhost:8080/auth/cb"
 
 [server]
-bind = "127.0.0.1:5000"
+bind = "127.0.0.1:5080"
 
 [data]
 dir = "deploy/data"
@@ -59,6 +63,10 @@ TOML
 		echo "wrote config.toml: set esi.client_id and esi.client_secret to log in"
 	fi
 fi
+
+# Where deploy/Caddyfile.dev looks for a backend on the host (config.toml files written before
+# used 5000).
+export WAITLIST__SERVER__BIND=127.0.0.1:5080
 
 if [ "$dev_esi" = false ]; then
 	exec cargo run -p waitlist -- serve

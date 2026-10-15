@@ -1,0 +1,100 @@
+//! Public waitlist status for logged-out visitors (an extension beyond the legacy API, where
+//! the waitlist and its event stream needed a login).
+//!
+//! - `GET /api/public/status`: per non-archived waitlist its ID, name, open state and the number
+//!   of accounts waiting. No login; may be cached for 10 seconds.
+//! - `GET /api/public/stream`: live events for anonymous clients: the `status` topic
+//!   (`status_update`, `{"waitlist_id": …}`) and the `incursions` topic (`incursions_update`).
+//!   `/api/incursions/stream` keeps carrying only `incursions`.
+
+use axum::Json;
+use axum::extract::State;
+use axum::http::{HeaderValue, header};
+use axum::response::{IntoResponse, Response};
+use serde::Serialize;
+use utoipa::ToSchema;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
+use wl_live::topics;
+
+use super::waitlist::waitlist_rows;
+use crate::openapi::tags;
+use crate::{ApiResult, AppState};
+
+const CACHE_CONTROL: &str = "public, max-age=10";
+
+pub fn routes() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(status))
+        .routes(routes!(stream))
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+struct PublicStatus {
+    /// Every non-archived waitlist, by ID.
+    waitlists: Vec<PublicWaitlist>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+struct PublicWaitlist {
+    /// Waitlist ID.
+    id: i64,
+    name: String,
+    /// Whether pilots can x-up.
+    open: bool,
+    /// Accounts with an x-up on the waitlist.
+    waiting: i64,
+}
+
+/// Public waitlist status
+///
+/// For every non-archived waitlist: its name, whether it is open and how many accounts are
+/// waiting. No login needed; the answer may be cached for 10 seconds
+/// (`Cache-Control: public, max-age=10`). Clients refetch on `status_update` from
+/// `GET /api/public/stream`. An extension beyond the legacy API.
+#[utoipa::path(
+    get,
+    path = "/api/public/status",
+    operation_id = "public_status",
+    tag = tags::WAITLIST,
+    responses((status = 200, description = "The waitlists' status.", body = PublicStatus)),
+)]
+async fn status(State(state): State<AppState>) -> ApiResult<Response> {
+    let waitlists = waitlist_rows(state.db(), false)
+        .await?
+        .into_iter()
+        .map(|w| PublicWaitlist {
+            id: w.id,
+            name: w.name,
+            open: w.is_open > 0,
+            waiting: w.waiting,
+        })
+        .collect();
+    let mut response = Json(PublicStatus { waitlists }).into_response();
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(CACHE_CONTROL),
+    );
+    Ok(response)
+}
+
+/// Public events
+///
+/// A public server-sent event stream of the `status` topic (`status_update`, JSON
+/// `{"waitlist_id": …}`, whenever a waitlist's status may have changed: refetch
+/// `GET /api/public/status`) and the `incursions` topic (`incursions_update`, as on
+/// `GET /api/incursions/stream`). The stream opens with a `: connected` comment; keep-alive
+/// comments follow every 15 seconds. An extension beyond the legacy API.
+#[utoipa::path(
+    get,
+    path = "/api/public/stream",
+    operation_id = "public_stream",
+    tag = tags::LIVE,
+    responses((status = 200, description = "The event stream.", body = String, content_type = "text/event-stream")),
+)]
+async fn stream(State(state): State<AppState>) -> Response {
+    super::sse::event_stream(
+        &state,
+        vec![topics::STATUS.to_owned(), topics::INCURSIONS.to_owned()],
+    )
+}

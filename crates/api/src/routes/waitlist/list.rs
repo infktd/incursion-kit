@@ -1,13 +1,16 @@
 //! The waitlist itself.
 //!
-//! - `GET /api/waitlist?waitlist_id=` (any logged-in account): `{open, waitlist, categories}`.
-//!   `waitlist` is `null` when the list is closed or doesn't exist; `categories` are category
+//! - `GET /api/waitlist?waitlist_id=&include_closed=` (any logged-in account): `{open, waitlist,
+//!   categories}`. `waitlist` is `null` when the list is closed or doesn't exist, except that
+//!   `include_closed=true` returns a closed (existing, non-archived) list's entries to
+//!   `waitlist-view` (an extension; without it nothing changes). `categories` are category
 //!   names. What each entry shows depends on the viewer, exactly as in the legacy waitlist:
 //!   - the entry's and fits' characters, hours in fleet, review comment, x-up message and all
 //!     tags: own entry or `waitlist-view` (others see only the public tags);
 //!   - DNA, implants and fit analysis: own entry or `waitlist-view` + `fit-view`;
 //!   - `can_remove`: own entry or `waitlist-manage`;
-//!   - `waitlist_note` (pinned pilot note): `waitlist-view`.
+//!   - `waitlist_note` (pinned pilot note): `waitlist-view`;
+//!   - `invited` (the recorded fleet invite, an extension): own entry or `waitlist-view`.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -31,13 +34,19 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[into_params(parameter_in = Query)]
 struct ListQuery {
     waitlist_id: i64,
+    /// With `waitlist-view`: return the entries of a closed waitlist too (`open` stays
+    /// `false`). Ignored without the permission and for unknown or archived waitlists. An
+    /// extension beyond the legacy API.
+    #[serde(default)]
+    include_closed: bool,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 struct WaitlistResponse {
     /// Whether the waitlist is open (`false` for an unknown waitlist).
     open: bool,
-    /// The entries in join order; `null` when the waitlist is closed or doesn't exist.
+    /// The entries in join order; `null` when the waitlist is closed (unless `include_closed`)
+    /// or doesn't exist.
     waitlist: Option<Vec<WaitlistEntry>>,
     /// Names of the waitlist categories, in configured order.
     categories: Vec<String>,
@@ -88,6 +97,19 @@ struct WaitlistEntryFit {
     is_alt: bool,
     /// The pilot's x-up message. Own entry or `waitlist-view` only.
     messagexup: Option<String>,
+    /// The last fleet invite sent for this fit (`POST /api/waitlist/invite`), until the fit
+    /// leaves the waitlist or the invite is cleared. Own entry or `waitlist-view` only; `null`
+    /// otherwise. An extension beyond the legacy API.
+    invited: Option<Invited>,
+}
+
+/// A recorded fleet invite.
+#[derive(Debug, Serialize, ToSchema)]
+struct Invited {
+    /// The inviting account's main (`corporation_id` is always absent).
+    by: Character,
+    /// When the invite was sent (Unix seconds).
+    at: i64,
 }
 
 #[derive(sqlx::FromRow)]
@@ -111,6 +133,9 @@ struct Row {
     fitting_dna: String,
     fitting_hull: TypeId,
     implant_set_implants: String,
+    invite_by_id: Option<i64>,
+    invite_by_name: Option<String>,
+    invite_at: Option<i64>,
 }
 
 fn character(id: i64, name: String) -> Character {
@@ -128,7 +153,9 @@ fn character(id: i64, name: String) -> Character {
 /// own entry (or `waitlist-view`) shows the characters, hours in fleet, review comment, x-up
 /// message and all tags; DNA, implants and fit analysis need the own entry or `waitlist-view`
 /// and `fit-view`; `can_remove` is set for the own entry or with `waitlist-manage`; pinned
-/// pilot notes need `waitlist-view`. A hull missing from the static data is a 400 `type error:
+/// pilot notes need `waitlist-view`; the recorded invite (`invited`) needs the own entry or
+/// `waitlist-view`. With `include_closed=true`, `waitlist-view` also gets the entries of a
+/// closed waitlist (`open` stays `false`); the default is the legacy behaviour. A hull missing from the static data is a 400 `type error:
 /// …`, as in the legacy waitlist.
 #[utoipa::path(
     get,
@@ -148,11 +175,16 @@ async fn list(
     let categories = &data.categories.categories;
     let category_names: Vec<String> = categories.iter().map(|c| c.name.clone()).collect();
 
-    let is_open: Option<i8> = sqlx::query_scalar("SELECT is_open FROM waitlist WHERE id = ?")
-        .bind(q.waitlist_id)
-        .fetch_optional(state.db())
-        .await?;
-    if is_open.unwrap_or(0) == 0 {
+    let can_view = account.has_access("waitlist-view");
+    let flags: Option<(i8, i8)> =
+        sqlx::query_as("SELECT is_open, is_archived FROM waitlist WHERE id = ?")
+            .bind(q.waitlist_id)
+            .fetch_optional(state.db())
+            .await?;
+    let is_open = flags.is_some_and(|(open, _)| open > 0);
+    let show_closed =
+        q.include_closed && can_view && flags.is_some_and(|(_, archived)| archived == 0);
+    if !is_open && !show_closed {
         return Ok(Json(WaitlistResponse {
             open: false,
             waitlist: None,
@@ -180,13 +212,18 @@ async fn list(
             char_we.name char_we_name,
             fitting.dna fitting_dna,
             fitting.hull fitting_hull,
-            implant_set.implants implant_set_implants
+            implant_set.implants implant_set_implants,
+            char_inv.id invite_by_id,
+            char_inv.name invite_by_name,
+            wi.invited_at invite_at
         FROM waitlist_entry_fit wef
         JOIN waitlist_entry we ON wef.entry_id = we.id
         JOIN `character` char_wef ON wef.character_id = char_wef.id
         JOIN `character` char_we ON we.account_id = char_we.id
         JOIN fitting ON wef.fit_id = fitting.id
         JOIN implant_set ON wef.implant_set_id = implant_set.id
+        LEFT JOIN waitlist_invite wi ON wi.fit_id = wef.id
+        LEFT JOIN `character` char_inv ON wi.invited_by = char_inv.id
         WHERE we.waitlist_id = ?
         ORDER BY we.id ASC, wef.id ASC",
     )
@@ -201,7 +238,6 @@ async fn list(
         hull_names.insert(hull, eve.require(hull)?.name.clone());
     }
 
-    let can_view = account.has_access("waitlist-view");
     let can_view_fits = can_view && account.has_access("fit-view");
     let can_manage = account.has_access("waitlist-manage");
 
@@ -261,6 +297,7 @@ async fn list(
             fit_analysis: None,
             is_alt: row.wef_is_alt > 0,
             messagexup: None,
+            invited: None,
         };
 
         if ours || can_view {
@@ -269,6 +306,14 @@ async fn list(
             fit.review_comment = row.wef_review_comment;
             fit.messagexup = row.wef_messagexup;
             fit.tags = tags.collect();
+            if let (Some(id), Some(name), Some(at)) =
+                (row.invite_by_id, row.invite_by_name, row.invite_at)
+            {
+                fit.invited = Some(Invited {
+                    by: character(id, name),
+                    at,
+                });
+            }
         } else {
             fit.tags = tags.filter(|t| data.public_tags.contains(t)).collect();
         }
@@ -292,7 +337,7 @@ async fn list(
     }
 
     Ok(Json(WaitlistResponse {
-        open: true,
+        open: is_open,
         waitlist: Some(entries.into_values().collect()),
         categories: category_names,
     }))
