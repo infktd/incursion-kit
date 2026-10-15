@@ -36,11 +36,12 @@ pub mod topics {
     pub const WAITLIST: &str = "waitlist";
     /// Fleet composition changes, for accounts with `fleet-view`.
     pub const FLEET_COMP: &str = "fleet_comp";
-    /// Incursion tracker changes, for everyone (served on the public `/api/incursions/stream`,
-    /// not on the authenticated stream). Not part of the legacy catalogue.
+    /// Incursion tracker changes, for everyone (served on the public `/api/incursions/stream`
+    /// and `/api/public/stream`, and on the authenticated stream with `?public=1`). Not part of
+    /// the legacy catalogue.
     pub const INCURSIONS: &str = "incursions";
     /// Public waitlist status changes, for everyone (served on the public `/api/public/stream`,
-    /// not on the authenticated stream). Not part of the legacy catalogue.
+    /// and on the authenticated stream with `?public=1`). Not part of the legacy catalogue.
     pub const STATUS: &str = "status";
     /// Community data file changes, for everyone (served on the authenticated and the public
     /// stream). Not part of the legacy catalogue.
@@ -51,6 +52,10 @@ pub mod topics {
     /// Wiki changes of pages anonymous visitors can't see (drafts, login- or permission-gated
     /// pages), on the authenticated stream only. Not part of the legacy catalogue.
     pub const WIKI_RESTRICTED: &str = "wiki_restricted";
+
+    /// The topics of the public stream (`/api/public/stream`); the authenticated stream adds
+    /// them with `?public=1`, so a logged-in page needs one connection.
+    pub const PUBLIC: [&str; 4] = [STATUS, INCURSIONS, DATA, WIKI];
 
     /// The per-account topic: `account;<account_id>` (account id = main character id).
     pub fn account(account_id: i64) -> String {

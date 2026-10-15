@@ -9,7 +9,7 @@ use common::{example_store, id, read};
 use pretty_assertions::assert_eq;
 use wl_fitting::editor::{
     self, CategoriesDocument, CategoryRuleEntry, DoctrineFitInput, FieldError, FitSelector,
-    FitWrite, Rejection, TagsDocument, TypeKind,
+    FitWrite, ImplantSetInput, Rejection, TagsDocument, TypeKind,
 };
 use wl_fitting::{
     DEFAULT_RULES, DataFile, DataSet, DataStore, EditError, Fitting, FittingNote, ImplantEntry,
@@ -380,7 +380,7 @@ fn notes_implants_tags_and_categories_round_trip() {
         fits: vec![],
     };
     apply(&store, DataFile::Implants, |content, data| {
-        editor::create_implant_set(content, data, &set)
+        editor::create_implant_set(content, data, &set.clone().into())
     })
     .expect("set created");
     let reopened = reopen(&store);
@@ -394,7 +394,7 @@ fn notes_implants_tags_and_categories_round_trip() {
     bad.slots[1].slot = 2;
     bad.slots[1].default[0].name = "Hobgoblin II".into();
     let mut problems = match store.edit(DataFile::Implants, true, |content, data| {
-        editor::create_implant_set(content, data, &bad)
+        editor::create_implant_set(content, data, &bad.clone().into())
     }) {
         Err(EditError::Edit(Rejection::Invalid(problems))) => problems,
         other => panic!("{other:?}"),
@@ -699,7 +699,7 @@ fn fits_link_to_implant_sets() {
         ..base.clone()
     };
     apply(&store, DataFile::Implants, |content, data| {
-        editor::create_implant_set(content, data, &budget)
+        editor::create_implant_set(content, data, &budget.clone().into())
     })
     .expect("set created");
     let data = reopen(&store).get();
@@ -725,7 +725,7 @@ fn fits_link_to_implant_sets() {
         ..base.clone()
     };
     let problems = match store.edit(DataFile::Implants, true, |content, data| {
-        editor::create_implant_set(content, data, &other)
+        editor::create_implant_set(content, data, &other.clone().into())
     }) {
         Err(EditError::Edit(Rejection::Invalid(problems))) => problems,
         other => panic!("{other:?}"),
@@ -811,6 +811,54 @@ fn fits_link_to_implant_sets() {
     assert_eq!(
         set_fits(&reopen(&store)),
         [(base.name.clone(), vec![]), ("Budget".to_string(), vec![])]
+    );
+
+    // Updating a set without `fits` keeps its fits (also through a rename); `[]` empties it.
+    let linked = DoctrineFitInput {
+        implant_set: Some(Some("Budget".into())),
+        ..renamed.clone()
+    };
+    write(FitWrite::Update(&selector("VINDI_2"), &linked)).expect("linked");
+    let mut slots_only = ImplantSetInput::from(budget.clone());
+    slots_only.fits = None;
+    slots_only.name = "Budget 2".into();
+    apply(&store, DataFile::Implants, |content, data| {
+        editor::update_implant_set(content, data, "Budget", &slots_only)
+    })
+    .expect("set updated");
+    assert_eq!(
+        set_fits(&reopen(&store)),
+        [
+            (base.name.clone(), vec![]),
+            ("Budget 2".to_string(), vec!["VINDI_2".to_string()])
+        ]
+    );
+    let emptied = ImplantSetInput {
+        fits: Some(vec![]),
+        ..slots_only.clone()
+    };
+    apply(&store, DataFile::Implants, |content, data| {
+        editor::update_implant_set(content, data, "Budget 2", &emptied)
+    })
+    .expect("set emptied");
+    assert_eq!(store.get().implant_set_of("VINDI_2"), None);
+    // A new set without `fits` has none.
+    let fresh = ImplantSetInput {
+        name: "Fresh".into(),
+        ..slots_only
+    };
+    apply(&store, DataFile::Implants, |content, data| {
+        editor::create_implant_set(content, data, &fresh)
+    })
+    .expect("set created");
+    assert!(
+        reopen(&store)
+            .get()
+            .implants
+            .last()
+            .unwrap()
+            .fits
+            .is_empty()
     );
     // No dangling links (the renamed fit's skill plans no longer build, as documented).
     let warnings = store.get().warnings.clone();

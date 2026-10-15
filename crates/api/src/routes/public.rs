@@ -92,8 +92,10 @@ async fn status(State(state): State<AppState>) -> ApiResult<Json<PublicStatus>> 
 /// `GET /api/public/status`), the `incursions` topic (`incursions_update`, as on
 /// `GET /api/incursions/stream`) and the `data` topic (`data_update`, JSON `{"file": …}`, when a
 /// community data file changed: refetch `GET /api/fittings`) and the `wiki` topic (`wiki_update`,
-/// JSON `{"slug", "section", "change"}`, when a public page or a section changed). The stream opens with a `: connected` comment; keep-alive
-/// comments follow every 15 seconds. An extension beyond the legacy API.
+/// JSON `{"slug", "section", "change"}`, when a public page or a section changed). The stream opens
+/// with a `: connected` comment; keep-alive comments follow every 15 seconds. A logged-in client
+/// can get these topics on `GET /api/sse/stream?public=1` instead, so it holds one stream rather
+/// than two. An extension beyond the legacy API.
 #[utoipa::path(
     get,
     path = "/api/public/stream",
@@ -104,11 +106,9 @@ async fn status(State(state): State<AppState>) -> ApiResult<Json<PublicStatus>> 
 async fn stream(State(state): State<AppState>) -> Response {
     super::sse::event_stream(
         &state,
-        vec![
-            topics::STATUS.to_owned(),
-            topics::INCURSIONS.to_owned(),
-            topics::DATA.to_owned(),
-            topics::WIKI.to_owned(),
-        ],
+        topics::PUBLIC
+            .iter()
+            .map(|topic| topic.to_string())
+            .collect(),
     )
 }

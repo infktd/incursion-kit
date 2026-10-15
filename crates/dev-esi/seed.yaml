@@ -272,8 +272,12 @@ corporations:
     wallets:
       - { division: 1, balance: 1250000000 }
     journal:
+      # Dated at the reset (`now`), so the deposit is after the last daily SRP reset (11:00 UTC by
+      # default) at any time of day and Tarek's daily coverage is active until the next one (and
+      # covers his seeded loss). A fixed age (`-6h`) made it expired for six hours a day;
+      # `tests/seed_srp.rs` checks every minute of the day.
       - division: 1
-        date: -6h
+        date: now
         ref_type: player_donation
         amount: 20000000
         description: Dev Vindi Tarek deposited cash into Dev SRP Holding's account
@@ -393,9 +397,11 @@ wars:
     started: -2d
 
 killmails:
+  # Tarek's loss, covered by his daily SRP deposit: both dated at the reset (`now`, the deposit is
+  # read first), so the loss is covered at any time of day (`seed_srp`).
   - killmail_id: 130000001
     killmail_hash: 0d1e2f3a4b5c6d7e8f90a1b2c3d4e5f60718293a
-    killmail_time: -5h
+    killmail_time: now
     solar_system_id: 30000052
     victim:
       character_id: 2120000005

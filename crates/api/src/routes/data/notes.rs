@@ -6,7 +6,7 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
-use wl_fitting::editor::{self, FitNoteView};
+use wl_fitting::editor::{self, FitNoteView, ImplantSetInput};
 use wl_fitting::{DataFile, FittingNote, ImplantSet};
 
 use super::{FITS_MANAGE, WriteQuery, edit};
@@ -256,7 +256,7 @@ async fn get_set(
     tag = tags::DATA,
     security(("session" = ["fits-manage"])),
     params(WriteQuery),
-    request_body = ImplantSet,
+    request_body = ImplantSetInput,
     responses(
         (status = 200, description = "Valid (and saved unless a dry run).", body = ValidationReport),
         (status = 400, description = "Invalid: the errors with their field paths (`slots[2].default[0].name`).", body = ValidationReport),
@@ -266,7 +266,7 @@ async fn create_set(
     State(state): State<AppState>,
     account: AuthenticatedAccount,
     Query(query): Query<WriteQuery>,
-    JsonBody(set): JsonBody<ImplantSet>,
+    JsonBody(set): JsonBody<ImplantSetInput>,
 ) -> ApiResult<Json<ValidationReport>> {
     account.require_access(FITS_MANAGE)?;
     edit(
@@ -280,8 +280,10 @@ async fn create_set(
 
 /// Update an implant set
 ///
-/// Replaces (and possibly renames) the set `name`. Saved like a create. Requires
-/// `fits-manage`. An extension beyond the legacy API.
+/// Replaces (and possibly renames) the set `name`. Saved like a create. Without `fits` (or with
+/// `"fits": null`) the set keeps its fits, the way a fit write without `implant_set` keeps the
+/// fit's set; `"fits": []` takes every fit out of the set. Requires `fits-manage`. An extension
+/// beyond the legacy API.
 #[utoipa::path(
     put,
     path = "/api/data/implant-sets/{name}",
@@ -289,7 +291,7 @@ async fn create_set(
     tag = tags::DATA,
     security(("session" = ["fits-manage"])),
     params(("name" = String, Path, description = "Current set name."), WriteQuery),
-    request_body = ImplantSet,
+    request_body = ImplantSetInput,
     responses(
         (status = 200, description = "Valid (and saved unless a dry run).", body = ValidationReport),
         (status = 400, description = "Invalid: the errors with their field paths.", body = ValidationReport),
@@ -301,7 +303,7 @@ async fn update_set(
     account: AuthenticatedAccount,
     Path(name): Path<String>,
     Query(query): Query<WriteQuery>,
-    JsonBody(set): JsonBody<ImplantSet>,
+    JsonBody(set): JsonBody<ImplantSetInput>,
 ) -> ApiResult<Json<ValidationReport>> {
     account.require_access(FITS_MANAGE)?;
     edit(

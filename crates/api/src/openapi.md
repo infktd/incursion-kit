@@ -8,9 +8,9 @@ community waitlist, so existing frontends keep working.
   session, `access denied` without a permission, `404 Not Found` for unknown paths, unsupported
   methods and malformed parameters.
 - **Request bodies** are JSON; the `Content-Type` header is optional.
-- **Live events** are server-sent events: `GET /api/sse/stream` (logged in),
-  `GET /api/incursions/stream` (public) and `GET /api/public/stream` (public: waitlist status and
-  incursions).
+- **Live events** are server-sent events: `GET /api/sse/stream` (logged in; `?public=1` adds the
+  public topics), `GET /api/incursions/stream` (public) and `GET /api/public/stream` (public:
+  waitlist status and incursions).
 - **Extensions** beyond the legacy API (waitlist administration, gates, recorded invites, public
   status) say so in their descriptions; they add endpoints and fields without changing existing
   ones.

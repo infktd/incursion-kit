@@ -146,8 +146,10 @@ state.live().publish(&topics::account(account_id), events::WAKEUP, text);   // p
   `wl_live::events`.
 - **Additive topics.** The `incursions` topic (`incursions_update`) and the `status` topic
   (`status_update`) are not in the legacy catalogue. They are served to anonymous clients
-  (`incursions` on `GET /api/incursions/stream`, both on `GET /api/public/stream`) and not on the
-  authenticated stream (`routes/incursions.rs`, `routes/public.rs`, `docs/incursions-api.md`).
+  (`incursions` on `GET /api/incursions/stream`, both on `GET /api/public/stream`) and on the
+  authenticated stream only with the opt-in `?public=1` (`wl_live::topics::PUBLIC`), so a
+  logged-in page needs one connection (`routes/incursions.rs`, `routes/public.rs`,
+  `routes/sse.rs`, `docs/incursions-api.md`).
 - **Extensions.** New endpoints and fields beyond the legacy API say so in their doc comments
   and are listed in `docs/api.md` ("Extensions beyond the legacy API"). Legacy behaviour stays
   the default; an opt-in goes in a new optional parameter or field.

@@ -144,7 +144,7 @@ struct LoginUrlQuery {
 
 /// A boolean query flag as the legacy server parsed it: `true`/`on`/`yes`/`1` or
 /// `false`/`off`/`no`/`0` (any case); absent means false.
-fn flag<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+pub(crate) fn flag<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
     let value = String::deserialize(deserializer)?;
     match value.to_ascii_lowercase().as_str() {
         "true" | "on" | "yes" | "1" => Ok(true),

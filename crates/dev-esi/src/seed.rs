@@ -90,9 +90,14 @@ impl SeedTime {
     }
 
     pub fn parse(value: &str) -> Option<Self> {
+        Self::parse_at(value, Self::now())
+    }
+
+    /// [`SeedTime::parse`] with relative times relative to `now`.
+    pub fn parse_at(value: &str, now: Self) -> Option<Self> {
         let value = value.trim();
         if value == "now" {
-            return Some(Self::now());
+            return Some(now);
         }
         if let Ok(time) = DateTime::parse_from_rfc3339(value) {
             return Some(Self(time.with_timezone(&Utc)));
@@ -111,7 +116,7 @@ impl SeedTime {
             'd' => Duration::days(amount),
             _ => return None,
         };
-        Some(Self(Self::now().0 + offset * sign))
+        Some(Self(now.0 + offset * sign))
     }
 
     /// As ESI formats times: `2026-10-14T12:00:00Z`.

@@ -28,7 +28,7 @@ pub use fits::{
     DoctrineFitInput, DoctrineFitView, EftParse, FitItem, FitLayout, FitSelector, FitWrite,
     create_fit, delete_fit, doctrine_fits, parse_eft, render_eft, update_fit, write_fit,
 };
-pub use implants::{create_implant_set, delete_implant_set, update_implant_set};
+pub use implants::{ImplantSetInput, create_implant_set, delete_implant_set, update_implant_set};
 pub use notes::{FitNoteView, NoteTarget, create_note, delete_note, fit_notes, update_note};
 pub use rules::{
     BadgeApprovalEntry, FitCheckSection, FleetSection, ImplantModuleRuleEntry, MotdRoleEntry,

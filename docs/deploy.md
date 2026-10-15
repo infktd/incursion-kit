@@ -96,6 +96,20 @@ The frontend must be on the same origin as the API (the session cookie is `SameS
 there is no CORS). A server-rendered frontend that calls the API from the server must forward
 the `authToken` cookie.
 
+### HTTP/2
+
+Serve the site over HTTP/2. Every open page holds a server-sent event stream (`/api/sse/stream`,
+or `/api/public/stream` when logged out), and over HTTP/1.1 each stream occupies one of the six
+connections a browser opens per host: with a few tabs open the streams take them all, and page
+loads and API calls queue until a tab lets go of its stream. HTTP/2 multiplexes every stream and
+request of a host over one connection, so the number of tabs doesn't matter. Caddy serves HTTP/2
+(and HTTP/3) by default on its HTTPS sites, so `deploy/Caddyfile.prod` needs nothing; a different
+reverse proxy must have HTTP/2 enabled on its TLS listener (browsers only speak HTTP/2 over TLS),
+and must not buffer `text/event-stream` responses. Clients should still hold one stream per page
+(`/api/sse/stream?public=1` carries the public topics too, see
+[api.md](api.md#live-events)). The development stack (`deploy/Caddyfile.dev`, plain HTTP on
+`:8080`) is HTTP/1.1, which is where too many streams show first.
+
 The interactive API reference is at `https://waitlist.example.org/api/docs`.
 
 ## The Docker image

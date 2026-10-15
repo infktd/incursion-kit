@@ -729,6 +729,7 @@ dependencies = [
  "wl-eve-data",
  "wl-fitting",
  "wl-live",
+ "wl-srp",
  "wl-workers",
 ]
 

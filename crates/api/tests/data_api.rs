@@ -268,6 +268,35 @@ async fn doctrine_fits_round_trip() {
         json!({ "name": "ARMOR_VINDI", "dna": vindi["dna"] })
     );
 
+    // Saving the set without `fits` (an older client, the YAML round trip) keeps its fits;
+    // `"fits": []` takes them out.
+    let slots_only = json!({ "name": set["name"], "slots": set["slots"] });
+    let res = env
+        .send_json(
+            Method::PUT,
+            "/api/data/implant-sets/Implants",
+            me,
+            &slots_only,
+        )
+        .await;
+    assert_eq!(res.status, 200, "{}", res.text());
+    let kept: Value = env.get("/api/data/implant-sets/Implants", me).await.json();
+    assert_eq!(kept["fits"], json!(["NEW_PALADIN"]));
+    let fit: Value = env.get("/api/data/fits/NEW_PALADIN", me).await.json();
+    assert_eq!(fit["implant_set"], "Implants");
+    let mut emptied = slots_only.clone();
+    emptied["fits"] = json!([]);
+    let res = env
+        .send_json(Method::PUT, "/api/data/implant-sets/Implants", me, &emptied)
+        .await;
+    assert_eq!(res.status, 200, "{}", res.text());
+    let fit: Value = env.get("/api/data/fits/NEW_PALADIN", me).await.json();
+    assert_eq!(fit["implant_set"], Value::Null);
+    let res = env
+        .send_json(Method::PUT, "/api/data/implant-sets/Implants", me, &set)
+        .await;
+    assert_eq!(res.status, 200, "{}", res.text());
+
     // Delete: the file is as before, and the fit leaves its set.
     let res = env.delete("/api/data/fits/NEW_PALADIN", me).await;
     assert_eq!(res.status, 200, "{}", res.text());

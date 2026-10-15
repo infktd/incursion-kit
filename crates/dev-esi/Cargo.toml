@@ -47,4 +47,5 @@ wl-esi.workspace = true
 wl-eve-data.workspace = true
 wl-fitting.workspace = true
 wl-live.workspace = true
+wl-srp.workspace = true
 wl-workers.workspace = true

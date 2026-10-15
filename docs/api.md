@@ -168,11 +168,20 @@ proxies which buffer pass the response on immediately; keep-alive comments follo
 seconds.
 
 - `GET /api/sse/stream` (logged in): the topics `announcments`, `waitlist`,
-  `account;<account_id>`, `data`, `wiki` and `wiki_restricted`, plus `fleet_comp` with `fleet-view`. The topic set is fixed when the
-  stream opens; reconnect after a role change.
+  `account;<account_id>`, `data`, `wiki` and `wiki_restricted`, plus `fleet_comp` with
+  `fleet-view`. With `?public=1` (an extension; also `true`) it adds the public topics `status`
+  and `incursions`, so a logged-in page needs only this one stream. The topic set is fixed when
+  the stream opens; reconnect after a role change.
 - `GET /api/incursions/stream` (public): the topic `incursions`.
 - `GET /api/public/stream` (public): the topics `status`, `incursions`, `data` and `wiki` (an
   extension; a logged-out page needs only this one).
+
+One stream per page matters over HTTP/1.1, where a browser opens at most six connections per
+host and every open stream holds one: a page holding two streams in each of three tabs leaves no
+connection for API requests. Over HTTP/2 (production, see
+[deploy.md](deploy.md#http2)) all streams and requests of a host share one connection. Every
+event is sent with an `event:` name: none arrives as an unnamed `message`, so legacy clients
+(named listeners, plus `onmessage` for `message`) ignore the events they don't know.
 
 | Topic | Event | Data | Clients |
 |---|---|---|---|
@@ -252,7 +261,8 @@ null, …}` as before.
   [Conventions](#conventions)): `{"waitlists": [{"id", "name", "open", "waiting"}]}` for every
   non-archived waitlist.
 - `GET /api/public/stream` (no login): `status_update` (`{"waitlist_id"}`, refetch the status)
-  and `incursions_update` events.
+  and `incursions_update` events. A logged-in client gets them on
+  `GET /api/sse/stream?public=1` instead of opening this stream as well.
 
 **Killmail factions.** The SRP killmail views name NPC killers. An NPC attacker has no
 character, corporation or alliance; ESI gives its `faction_id` instead (`500019`, Sansha's

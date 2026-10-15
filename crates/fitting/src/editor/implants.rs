@@ -2,15 +2,48 @@
 
 use std::collections::BTreeSet;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use wl_eve_data::{Category, EveData};
 
 use super::{Edited, Problems, Rejection, check_name, write_yaml};
-use crate::{DataFile, DataSet, ImplantEntry, ImplantSet, fittings};
+use crate::{DataFile, DataSet, ImplantEntry, ImplantSet, ImplantSlot, fittings};
 
 const MAX_NAME: usize = 100;
 /// Doctrine fit names are at most this long (see the fits editor).
 const MAX_FIT_NAME: usize = 100;
+
+/// An implant set to create, or the new state of one to update.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, utoipa::ToSchema)]
+pub struct ImplantSetInput {
+    pub name: String,
+    pub slots: Vec<ImplantSlot>,
+    /// The doctrine fits (by name) that use the set. Absent (or `null`): a new set has none and
+    /// an updated one keeps its fits, the way a fit write without `implant_set` keeps the fit's
+    /// set; `[]` takes every fit out of the set.
+    #[serde(default)]
+    pub fits: Option<Vec<String>>,
+}
+
+impl ImplantSetInput {
+    /// The set to store: `fits` when given, else `keep`.
+    fn into_set(self, keep: &[String]) -> ImplantSet {
+        ImplantSet {
+            name: self.name,
+            slots: self.slots,
+            fits: self.fits.unwrap_or_else(|| keep.to_vec()),
+        }
+    }
+}
+
+impl From<ImplantSet> for ImplantSetInput {
+    fn from(set: ImplantSet) -> Self {
+        Self {
+            name: set.name,
+            slots: set.slots,
+            fits: Some(set.fits),
+        }
+    }
+}
 
 #[derive(Serialize)]
 struct ImplantFile<'a> {
@@ -131,19 +164,27 @@ fn position(sets: &[ImplantSet], name: &str) -> Result<usize, Rejection> {
 }
 
 /// Appends an implant set to `content` (`implants.yaml`).
-pub fn create_implant_set(content: &str, data: &DataSet, set: &ImplantSet) -> Edited {
+pub fn create_implant_set(content: &str, data: &DataSet, input: &ImplantSetInput) -> Edited {
     let mut sets = current(content)?;
-    let problems = check(data, set, &sets, None);
-    sets.push(set.clone());
+    let set = input.clone().into_set(&[]);
+    let problems = check(data, &set, &sets, None);
+    sets.push(set);
     save(content, &sets, problems)
 }
 
-/// Replaces (and possibly renames) the implant set `name`.
-pub fn update_implant_set(content: &str, data: &DataSet, name: &str, set: &ImplantSet) -> Edited {
+/// Replaces (and possibly renames) the implant set `name`. Without `fits` the set keeps its
+/// fits.
+pub fn update_implant_set(
+    content: &str,
+    data: &DataSet,
+    name: &str,
+    input: &ImplantSetInput,
+) -> Edited {
     let mut sets = current(content)?;
     let index = position(&sets, name)?;
-    let problems = check(data, set, &sets, Some(index));
-    sets[index] = set.clone();
+    let set = input.clone().into_set(&sets[index].fits);
+    let problems = check(data, &set, &sets, Some(index));
+    sets[index] = set;
     save(content, &sets, problems)
 }
 

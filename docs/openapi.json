@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "incursion-kit waitlist API",
-    "description": "The HTTP API of the incursion-kit waitlist server. It is wire-compatible with the legacy\ncommunity waitlist, so existing frontends keep working.\n\n- **Authentication**: the `authToken` session cookie, set by `POST /api/auth/cb` after an EVE SSO\n  login (`GET /api/auth/login_url`). Operations that need a login list the `session` scheme;\n  its scopes are the permission keys the operation requires.\n- **Errors** are plain text (`text/plain`), not JSON: `401 Authorization Required` without a\n  session, `access denied` without a permission, `404 Not Found` for unknown paths, unsupported\n  methods and malformed parameters.\n- **Request bodies** are JSON; the `Content-Type` header is optional.\n- **Live events** are server-sent events: `GET /api/sse/stream` (logged in),\n  `GET /api/incursions/stream` (public) and `GET /api/public/stream` (public: waitlist status and\n  incursions).\n- **Extensions** beyond the legacy API (waitlist administration, gates, recorded invites, public\n  status) say so in their descriptions; they add endpoints and fields without changing existing\n  ones.\n\nThe guide to the API (sessions, roles and permission keys, live event topics) is `docs/api.md`\nin the repository.\n",
+    "description": "The HTTP API of the incursion-kit waitlist server. It is wire-compatible with the legacy\ncommunity waitlist, so existing frontends keep working.\n\n- **Authentication**: the `authToken` session cookie, set by `POST /api/auth/cb` after an EVE SSO\n  login (`GET /api/auth/login_url`). Operations that need a login list the `session` scheme;\n  its scopes are the permission keys the operation requires.\n- **Errors** are plain text (`text/plain`), not JSON: `401 Authorization Required` without a\n  session, `access denied` without a permission, `404 Not Found` for unknown paths, unsupported\n  methods and malformed parameters.\n- **Request bodies** are JSON; the `Content-Type` header is optional.\n- **Live events** are server-sent events: `GET /api/sse/stream` (logged in; `?public=1` adds the\n  public topics), `GET /api/incursions/stream` (public) and `GET /api/public/stream` (public:\n  waitlist status and incursions).\n- **Extensions** beyond the legacy API (waitlist administration, gates, recorded invites, public\n  status) say so in their descriptions; they add endpoints and fields without changing existing\n  ones.\n\nThe guide to the API (sessions, roles and permission keys, live event topics) is `docs/api.md`\nin the repository.\n",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -5040,7 +5040,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImplantSet"
+                "$ref": "#/components/schemas/ImplantSetInput"
               }
             }
           },
@@ -5191,7 +5191,7 @@
           "data"
         ],
         "summary": "Update an implant set",
-        "description": "Replaces (and possibly renames) the set `name`. Saved like a create. Requires\n`fits-manage`. An extension beyond the legacy API.",
+        "description": "Replaces (and possibly renames) the set `name`. Saved like a create. Without `fits` (or with\n`\"fits\": null`) the set keeps its fits, the way a fit write without `implant_set` keeps the\nfit's set; `\"fits\": []` takes every fit out of the set. Requires `fits-manage`. An extension\nbeyond the legacy API.",
         "operationId": "data_update_implant_set",
         "parameters": [
           {
@@ -5217,7 +5217,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImplantSet"
+                "$ref": "#/components/schemas/ImplantSetInput"
               }
             }
           },
@@ -8207,7 +8207,7 @@
           "live"
         ],
         "summary": "Public events",
-        "description": "A public server-sent event stream of the `status` topic (`status_update`, JSON\n`{\"waitlist_id\": …}`, whenever a waitlist's status may have changed: refetch\n`GET /api/public/status`), the `incursions` topic (`incursions_update`, as on\n`GET /api/incursions/stream`) and the `data` topic (`data_update`, JSON `{\"file\": …}`, when a\ncommunity data file changed: refetch `GET /api/fittings`) and the `wiki` topic (`wiki_update`,\nJSON `{\"slug\", \"section\", \"change\"}`, when a public page or a section changed). The stream opens with a `: connected` comment; keep-alive\ncomments follow every 15 seconds. An extension beyond the legacy API.",
+        "description": "A public server-sent event stream of the `status` topic (`status_update`, JSON\n`{\"waitlist_id\": …}`, whenever a waitlist's status may have changed: refetch\n`GET /api/public/status`), the `incursions` topic (`incursions_update`, as on\n`GET /api/incursions/stream`) and the `data` topic (`data_update`, JSON `{\"file\": …}`, when a\ncommunity data file changed: refetch `GET /api/fittings`) and the `wiki` topic (`wiki_update`,\nJSON `{\"slug\", \"section\", \"change\"}`, when a public page or a section changed). The stream opens\nwith a `: connected` comment; keep-alive comments follow every 15 seconds. A logged-in client\ncan get these topics on `GET /api/sse/stream?public=1` instead, so it holds one stream rather\nthan two. An extension beyond the legacy API.",
         "operationId": "public_stream",
         "responses": {
           "200": {
@@ -8585,8 +8585,19 @@
           "live"
         ],
         "summary": "Live events",
-        "description": "A server-sent event stream. The topics are fixed at connect time: `announcments`, `waitlist`,\n`account;<account_id>`, `data` (community data file changes, an extension), `wiki` and\n`wiki_restricted` (`wiki_update` on wiki changes, extensions) and, with `fleet-view`,\n`fleet_comp`. Each event is\n`event: <name>` + `data: <JSON or text>`. The stream opens with a `: connected` comment;\nkeep-alive comments follow every 15 seconds. A\nclient that falls too far behind is disconnected and should reconnect and refetch. See\n`docs/api.md` for the event catalogue.",
+        "description": "A server-sent event stream. The topics are fixed at connect time: `announcments`, `waitlist`,\n`account;<account_id>`, `data` (community data file changes, an extension), `wiki` and\n`wiki_restricted` (`wiki_update` on wiki changes, extensions) and, with `fleet-view`,\n`fleet_comp`. With `?public=1` (an extension) the stream also carries the topics of\n`GET /api/public/stream` (`status_update`, `incursions_update`), so a logged-in client holds\none stream instead of two (over HTTP/1.1 a browser opens at most six connections per host).\nEach event is `event: <name>` + `data: <JSON or text>`; every event is named (none arrives\nas an unnamed `message`). The stream opens with a `: connected` comment; keep-alive comments\nfollow every 15 seconds. A client that falls too far behind is disconnected and should\nreconnect and refetch. See `docs/api.md` for the event catalogue.",
         "operationId": "stream",
+        "parameters": [
+          {
+            "name": "public",
+            "in": "query",
+            "description": "`1` (or `true`): also carry the public stream's topics (`status`, `incursions`), so a\nlogged-in client needs no second stream.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The event stream.",
@@ -8600,6 +8611,16 @@
           },
           "401": {
             "description": "`401 Authorization Required` without a valid session; `access denied` without the required permission key or access to the character.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`404 Not Found` when a path or query parameter is missing or malformed.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15492,6 +15513,35 @@
               "type": "string"
             },
             "description": "The doctrine fits (by name, as in `fits.dat`) that use this set. A fit is in at most one\nset. Optional in `implants.yaml` (left out when empty); older servers ignore it."
+          },
+          "name": {
+            "type": "string"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImplantSlot"
+            }
+          }
+        }
+      },
+      "ImplantSetInput": {
+        "type": "object",
+        "description": "An implant set to create, or the new state of one to update.",
+        "required": [
+          "name",
+          "slots"
+        ],
+        "properties": {
+          "fits": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The doctrine fits (by name) that use the set. Absent (or `null`): a new set has none and\nan updated one keeps its fits, the way a fit write without `implant_set` keeps the fit's\nset; `[]` takes every fit out of the set."
           },
           "name": {
             "type": "string"
