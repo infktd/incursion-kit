@@ -39,7 +39,8 @@ doctrine) to replace with your own. The full walk-through, including registering
 application and making yourself admin, is in [docs/deploy.md](docs/deploy.md).
 
 For development, `deploy/dev.sh` starts MySQL and Caddy in Docker and runs the backend with
-cargo (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+cargo; `deploy/dev.sh --dev-esi` does it without a CCP account, against a local stand-in for EVE
+SSO and ESI (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Documentation
 

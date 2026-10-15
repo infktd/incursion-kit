@@ -7,6 +7,18 @@
 	handle /api/* {
 		reverse_proxy backend:5000 host.docker.internal:5000 {
 			lb_policy first
+			# A request that finds the container missing moves on to the host at once.
+			lb_try_duration 2s
+			fail_duration 5s
+		}
+	}
+	# dev-esi, the fake EVE SSO and ESI (`deploy/dev.sh --dev-esi`): its login page and dashboard
+	# (/dev-esi/_dev). The container when running (compose.dev-esi.yaml), else dev-esi on the host.
+	handle_path /dev-esi/* {
+		reverse_proxy dev-esi:8090 host.docker.internal:8090 {
+			lb_policy first
+			# A request that finds the container missing moves on to the host at once.
+			lb_try_duration 2s
 			fail_duration 5s
 		}
 	}

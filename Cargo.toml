@@ -66,6 +66,7 @@ branca = "0.10.2"
 hex = "0.4.3"
 base64 = "0.23.1"
 rand = "0.10.3"
+aws-lc-rs = "1.18.2"
 
 # util
 config = { version = "0.15.27", default-features = false, features = ["toml"] }

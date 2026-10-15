@@ -22,6 +22,57 @@ reference is at `http://waitlist.localhost:8080/api/docs`.
 Without the script: `docker compose -f deploy/compose.yaml up -d mysql caddy`, then
 `cargo run -p waitlist` with a `config.toml` (see [docs/deploy.md](docs/deploy.md#configuration)).
 
+## Develop a frontend without a CCP account
+
+```sh
+deploy/dev.sh --dev-esi
+```
+
+runs the same stack, but the backend talks to **dev-esi** (`crates/dev-esi`), a local stand-in
+for EVE SSO and ESI, instead of CCP. No ESI application or EVE account is needed: "Log in with EVE"
+shows a page listing made-up characters, and you pick one. dev-esi runs on the host
+(`127.0.0.1:8090`); Caddy also serves it under `http://waitlist.localhost:8080/dev-esi/`, and its
+dashboard is at `http://waitlist.localhost:8080/dev-esi/_dev`. Your `config.toml` is not changed:
+the script points the backend at dev-esi through `WAITLIST__ESI__*` environment variables
+(`client_id` `dev-esi-client`, `client_secret` `dev-esi-secret`, `esi_url`, `sso_authorize_url`,
+`sso_token_url`), and the server logs a warning whenever these URLs are overridden.
+
+The default seed (`crates/dev-esi/seed.yaml`, printed by `cargo run -p dev-esi -- seed`) has:
+
+| Character | |
+|---|---|
+| Dev FC Aurora | waitlist **admin**, boss of a fleet that exists at start; alts Dev FC Aurora Alt (logi) and Dev FC Aurora Scout |
+| Dev FC Brann | **fc** role, not in a fleet |
+| Dev Logi Mira | logi pilot, passes the Nestor fits |
+| Dev Vindi Tarek | DPS with the HYBRID implant set, passes the Vindicator fits |
+| Dev Marauder Trainee | all doctrine skills but Marauders: Vindicator passes, Kronos/Paladin/Vargur fail |
+| Dev Newbro Pell | basic skills: fails every doctrine fit |
+| Dev Banned Rook | corporation banned on the waitlist: login is refused |
+| Dev Wartarget Vex | corporation at war: AT-WAR tag, logi blocked |
+| Dev SRP Ledger | member of the SRP wallet corporation (log it in as the SRP service account) |
+
+plus three incursions (high-, low- and null-sec), two killmails and an SRP wallet with deposits.
+`dev.sh --dev-esi` grants the roles and the ban with `cargo run -p dev-esi -- sql` (SQL for the
+waitlist database). Use your own seed with `--seed` (or `DEV_ESI_SEED`).
+
+dev-esi simulates fleets: when an FC invites a pilot, the pilot joins the requested squad after
+`fleet.invite_accept_delay_ms` (2 s), so the fleet updater takes them off the waitlist as in game.
+Everything else is changed through its control API (JSON under `/_dev/`, listed in
+`crates/dev-esi/src/control.rs`): form fleets, move pilots in and out, make someone boss, accept or
+decline invites, change skills, implants and ships, add killmails and wallet journal entries, set
+incursions and wars, revoke a character's tokens, read the event log (invites, MOTD changes,
+windows opened), and `POST /_dev/reset` back to the seed. A frontend's end-to-end tests can drive
+scenarios through it.
+
+dev-esi's access tokens are RS256 JWTs with EVE's claims, and it publishes its key at
+`/oauth/jwks`. The waitlist does not verify token signatures (it receives tokens directly from
+the SSO token endpoint and only reads their claims), so nothing else needs configuring.
+
+To run everything in containers instead: `docker compose -f deploy/compose.yaml -f
+deploy/compose.dev-esi.yaml --profile backend up -d --build` (see that file). dev-esi is never part
+of the production image or `compose.prod.yaml`; never point a public server at it, since anyone
+who reaches it can log in as any of its characters.
+
 ## Tests
 
 ```sh
@@ -33,6 +84,8 @@ TEST_DATABASE_URL=mysql://root:root@127.0.0.1:3307 cargo test --workspace
   without the variable they are skipped. Tests that need the static data skip when
   `deploy/sde/sde.sqlite` (or `WL_SDE_PATH`) is missing.
 - API tests run requests in-process against the real router (`crates/api/tests/common`).
+- `crates/dev-esi/tests/e2e.rs` runs the server over HTTP against dev-esi: SSO login, x-up,
+  fleet invite and the fleet updater seeing the pilot join.
 - Snapshot tests use [insta](https://insta.rs): review changes with `cargo insta review`.
 - The test data set is the bundled example data (`crates/fitting/example-data`), the same files
   a new install starts with.
@@ -64,6 +117,7 @@ plus `cargo deny check` (licences and advisories) and a Docker build.
 | `wl-srp` (`crates/srp`) | Ship replacement program: reports, coverage, wallet reconciliation. |
 | `wl-incursions` (`crates/incursions`) | The incursion tracker: spawn history, system roles, spawn windows. |
 | `wl-workers` (`crates/workers`) | Background workers: fleet, skill, war and incursion updaters and the tracker. |
+| `dev-esi` (`crates/dev-esi`) | Development only: a fake EVE SSO and ESI with a control API, for running the stack (and end-to-end tests) without a CCP account. |
 
 ## Conventions
 

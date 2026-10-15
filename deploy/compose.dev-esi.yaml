@@ -1,0 +1,40 @@
+# DEVELOPMENT ONLY. dev-esi, a fake EVE SSO and ESI, so the stack runs without a CCP account.
+# Added on top of compose.yaml; it also points the backend container at dev-esi:
+#
+#   docker compose -f deploy/compose.yaml -f deploy/compose.dev-esi.yaml --profile backend up -d --build
+#   # once the backend has migrated the database, grant the seed's roles and bans:
+#   docker compose -f deploy/compose.yaml -f deploy/compose.dev-esi.yaml exec -T dev-esi dev-esi sql \
+#     | docker compose -f deploy/compose.yaml exec -T -e MYSQL_PWD=root mysql mysql -uroot waitlist
+#
+# `deploy/dev.sh --dev-esi` does the same with the backend and dev-esi running on the host.
+# Log in at http://waitlist.localhost:8080 (through your frontend); dev-esi's dashboard is
+# http://waitlist.localhost:8080/dev-esi/_dev. Never use this file in production: dev-esi logs
+# anyone in as any of its characters.
+services:
+  dev-esi:
+    build:
+      context: ..
+      dockerfile: deploy/dev-esi.Dockerfile
+    command: ["--bind", "0.0.0.0:8090", "--sde", "/sde/sde.sqlite", "--state-dir", "/state"]
+    ports: ["127.0.0.1:8090:8090"]
+    volumes:
+      # The backend builds the static data file on first start; dev-esi reads it (restart
+      # dev-esi after the first start to pick it up).
+      - sde:/sde:ro
+      - dev-esi:/state
+
+  backend:
+    environment:
+      WAITLIST__APP__TOKEN_SECRET: ${DEV_TOKEN_SECRET:-0000000000000000000000000000000000000000000000000000000000000000}
+      WAITLIST__ESI__CLIENT_ID: dev-esi-client
+      WAITLIST__ESI__CLIENT_SECRET: dev-esi-secret
+      WAITLIST__ESI__URL: http://waitlist.localhost:8080/auth/cb
+      WAITLIST__ESI__ESI_URL: http://dev-esi:8090
+      WAITLIST__ESI__SSO_TOKEN_URL: http://dev-esi:8090/v2/oauth/token
+      # The browser goes here: through Caddy.
+      WAITLIST__ESI__SSO_AUTHORIZE_URL: http://waitlist.localhost:8080/dev-esi/v2/oauth/authorize
+    depends_on:
+      dev-esi: { condition: service_started }
+
+volumes:
+  dev-esi:

@@ -197,7 +197,29 @@ fn seed_data_dir(dir: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Overridden ESI/SSO URLs are for development and tests (e.g. dev-esi); say so loudly.
+fn warn_if_esi_overridden(esi: &wl_core::config::EsiConfig) {
+    let overridden: Vec<String> = [
+        ("esi_url", &esi.esi_url),
+        ("sso_authorize_url", &esi.sso_authorize_url),
+        ("sso_token_url", &esi.sso_token_url),
+    ]
+    .into_iter()
+    .filter_map(|(key, value)| {
+        let value = value.as_deref().map(str::trim).filter(|v| !v.is_empty())?;
+        Some(format!("esi.{key} = {value}"))
+    })
+    .collect();
+    if !overridden.is_empty() {
+        tracing::warn!(
+            "not using CCP's ESI/SSO ({}): fine for development, never in production",
+            overridden.join(", ")
+        );
+    }
+}
+
 async fn serve(config: Config) -> anyhow::Result<()> {
+    warn_if_esi_overridden(&config.esi);
     seed_data_dir(&config.data.dir)?;
     wl_eve_data::sde::ensure_sde(std::path::Path::new(&config.data.sde), &Default::default())
         .await

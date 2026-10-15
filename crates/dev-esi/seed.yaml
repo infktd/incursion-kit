@@ -1,0 +1,461 @@
+# The default dev-esi seed: a small, made-up EVE universe for developing against the waitlist
+# without a CCP account. Every ID and name here is fictional (only static data such as ship,
+# skill, implant and system IDs is real). See CONTRIBUTING.md ("Develop a frontend without a CCP
+# account") and `dev-esi --help`.
+#
+# Times are RFC 3339, `now`, or an offset from when the seed is loaded (`-3h`, `-2d`, `+30m`).
+#
+# `waitlist_role` and `waitlist_ban` are not ESI data: `dev-esi sql` turns them into SQL that grants
+# the roles and bans the corporations on the waitlist (deploy/dev.sh --dev-esi runs it for you).
+
+sso:
+  clients:
+    - client_id: dev-esi-client
+      client_secret: dev-esi-secret
+      # Empty: any callback URL (the waitlist's is http://waitlist.localhost:8080/auth/cb).
+      redirect_uris: []
+  access_token_lifetime_secs: 1199
+
+fleet:
+  # Pilots with auto_accept_invites join this long after an FC invites them.
+  invite_accept_delay_ms: 2000
+  default_layout:
+    - name: On Grid
+      squads: [Logi, Bastion, Other, Alts]
+    - name: Reserve
+      squads: [Reserve]
+
+esi:
+  incursions_cache_secs: 60
+
+skill_sets:
+  # Every skill the example doctrine (crates/fitting/example-data) uses, and their prerequisites,
+  # at V: flies and fits everything.
+  elite:
+    3452: 5  # Acceleration Control
+    23566: 5  # Advanced Drone Avionics
+    3430: 5  # Advanced Target Management
+    11207: 5  # Advanced Weapon Upgrades
+    3450: 5  # Afterburner
+    33095: 5  # Amarr Battlecruiser
+    3339: 5  # Amarr Battleship
+    3335: 5  # Amarr Cruiser
+    33091: 5  # Amarr Destroyer
+    3331: 5  # Amarr Frigate
+    33078: 5  # Armor Layering
+    26253: 5  # Armor Rigging
+    20494: 5  # Armored Command
+    11569: 5  # Armored Command Specialist
+    3405: 5  # Biology
+    3426: 5  # CPU Management
+    33096: 5  # Caldari Battlecruiser
+    3338: 5  # Caldari Battleship
+    3334: 5  # Caldari Cruiser
+    33092: 5  # Caldari Destroyer
+    3330: 5  # Caldari Frigate
+    3423: 5  # Capacitor Emission Systems
+    3418: 5  # Capacitor Management
+    3417: 5  # Capacitor Systems Operation
+    3354: 5  # Command Burst Specialist
+    23950: 5  # Command Ships
+    3316: 5  # Controlled Bursts
+    3411: 5  # Cybernetics
+    3437: 5  # Drone Avionics
+    23618: 5  # Drone Durability
+    3442: 5  # Drone Interfacing
+    12305: 5  # Drone Navigation
+    23606: 5  # Drone Sharpshooting
+    3436: 5  # Drones
+    22806: 5  # EM Armor Compensation
+    3427: 5  # Electronic Warfare
+    3432: 5  # Electronics Upgrades
+    3424: 5  # Energy Grid Upgrades
+    3453: 5  # Evasive Maneuvering
+    22807: 5  # Explosive Armor Compensation
+    24764: 5  # Fleet Command
+    19760: 5  # Frequency Modulation
+    3451: 5  # Fuel Conservation
+    33097: 5  # Gallente Battlecruiser
+    3336: 5  # Gallente Battleship
+    3332: 5  # Gallente Cruiser
+    33093: 5  # Gallente Destroyer
+    12486: 5  # Gallente Drone Specialization
+    3328: 5  # Gallente Frigate
+    3300: 5  # Gunnery
+    3441: 5  # Heavy Drone Operation
+    3454: 5  # High Speed Maneuvering
+    3394: 5  # Hull Upgrades
+    20495: 5  # Information Command
+    3352: 5  # Information Command Specialist
+    26252: 5  # Jury Rigging
+    22808: 5  # Kinetic Armor Compensation
+    33001: 5  # Ladar Sensor Compensation
+    12209: 5  # Large Autocannon Specialization
+    12212: 5  # Large Blaster Specialization
+    3309: 5  # Large Energy Turret
+    3307: 5  # Large Hybrid Turret
+    3308: 5  # Large Projectile Turret
+    12215: 5  # Large Pulse Laser Specialization
+    3348: 5  # Leadership
+    24241: 5  # Light Drone Operation
+    12096: 5  # Logistics Cruisers
+    19759: 5  # Long Distance Jamming
+    3428: 5  # Long Range Targeting
+    32999: 5  # Magnetometric Sensor Compensation
+    28667: 5  # Marauders
+    3392: 5  # Mechanics
+    33699: 5  # Medium Drone Operation
+    3306: 5  # Medium Energy Turret
+    3304: 5  # Medium Hybrid Turret
+    3305: 5  # Medium Projectile Turret
+    4385: 5  # Micro Jump Drive Operation
+    33098: 5  # Minmatar Battlecruiser
+    3337: 5  # Minmatar Battleship
+    30547: 5  # Minmatar Core Systems
+    3333: 5  # Minmatar Cruiser
+    30545: 5  # Minmatar Defensive Systems
+    33094: 5  # Minmatar Destroyer
+    3329: 5  # Minmatar Frigate
+    30551: 5  # Minmatar Offensive Systems
+    30554: 5  # Minmatar Propulsion Systems
+    30653: 5  # Minmatar Strategic Cruiser
+    3319: 5  # Missile Launcher Operation
+    3312: 5  # Motion Prediction
+    28880: 5  # Nanite Interfacing
+    28879: 5  # Nanite Operation
+    3449: 5  # Navigation
+    25538: 5  # Neurotoxin Control
+    25530: 5  # Neurotoxin Recovery
+    3413: 5  # Power Grid Management
+    3435: 5  # Propulsion Jamming
+    33002: 5  # Radar Sensor Compensation
+    3310: 5  # Rapid Firing
+    16069: 5  # Remote Armor Repair Systems
+    27902: 5  # Remote Hull Repair Systems
+    3439: 5  # Repair Drone Operation
+    3393: 5  # Repair Systems
+    3402: 5  # Science
+    3433: 5  # Sensor Linking
+    3311: 5  # Sharpshooter
+    3350: 5  # Shield Command
+    3351: 5  # Shield Command Specialist
+    21059: 5  # Shield Compensation
+    3422: 5  # Shield Emission Systems
+    3419: 5  # Shield Management
+    3416: 5  # Shield Operation
+    3425: 5  # Shield Upgrades
+    3431: 5  # Signature Analysis
+    3349: 5  # Skirmish Command
+    11572: 5  # Skirmish Command Specialist
+    3303: 5  # Small Energy Turret
+    3301: 5  # Small Hybrid Turret
+    3302: 5  # Small Projectile Turret
+    3327: 5  # Spaceship Command
+    3315: 5  # Surgical Strike
+    3420: 5  # Tactical Shield Manipulation
+    3429: 5  # Target Management
+    22809: 5  # Thermal Armor Compensation
+    28164: 5  # Thermodynamics
+    3317: 5  # Trajectory Analysis
+    3455: 5  # Warp Drive Operation
+    3318: 5  # Weapon Upgrades
+    11574: 5  # Wing Command
+  # Frigates, cruisers and support skills at III, no battleship, marauder, logistics or large
+  # turret skills: fails every doctrine fit ("Missing skills to online/use ...").
+  basic:
+    3452: 3  # Acceleration Control
+    3450: 3  # Afterburner
+    33095: 3  # Amarr Battlecruiser
+    3335: 3  # Amarr Cruiser
+    33091: 3  # Amarr Destroyer
+    3331: 3  # Amarr Frigate
+    33078: 3  # Armor Layering
+    26253: 3  # Armor Rigging
+    3405: 3  # Biology
+    3426: 3  # CPU Management
+    33096: 3  # Caldari Battlecruiser
+    3334: 3  # Caldari Cruiser
+    33092: 3  # Caldari Destroyer
+    3330: 3  # Caldari Frigate
+    3418: 3  # Capacitor Management
+    3316: 3  # Controlled Bursts
+    3411: 3  # Cybernetics
+    3437: 3  # Drone Avionics
+    23618: 3  # Drone Durability
+    3442: 3  # Drone Interfacing
+    12305: 3  # Drone Navigation
+    23606: 3  # Drone Sharpshooting
+    3436: 3  # Drones
+    22806: 3  # EM Armor Compensation
+    3432: 3  # Electronics Upgrades
+    3424: 3  # Energy Grid Upgrades
+    3453: 3  # Evasive Maneuvering
+    22807: 3  # Explosive Armor Compensation
+    19760: 3  # Frequency Modulation
+    3451: 3  # Fuel Conservation
+    33097: 3  # Gallente Battlecruiser
+    3332: 3  # Gallente Cruiser
+    33093: 3  # Gallente Destroyer
+    12486: 3  # Gallente Drone Specialization
+    3328: 3  # Gallente Frigate
+    3300: 3  # Gunnery
+    3454: 3  # High Speed Maneuvering
+    3394: 3  # Hull Upgrades
+    22808: 3  # Kinetic Armor Compensation
+    33001: 3  # Ladar Sensor Compensation
+    24241: 3  # Light Drone Operation
+    3428: 3  # Long Range Targeting
+    32999: 3  # Magnetometric Sensor Compensation
+    3392: 3  # Mechanics
+    33699: 3  # Medium Drone Operation
+    3306: 3  # Medium Energy Turret
+    3304: 3  # Medium Hybrid Turret
+    3305: 3  # Medium Projectile Turret
+    4385: 3  # Micro Jump Drive Operation
+    33098: 3  # Minmatar Battlecruiser
+    3333: 3  # Minmatar Cruiser
+    33094: 3  # Minmatar Destroyer
+    3329: 3  # Minmatar Frigate
+    3319: 3  # Missile Launcher Operation
+    3312: 3  # Motion Prediction
+    3449: 3  # Navigation
+    3413: 3  # Power Grid Management
+    33002: 3  # Radar Sensor Compensation
+    3310: 3  # Rapid Firing
+    3439: 3  # Repair Drone Operation
+    3402: 3  # Science
+    3433: 3  # Sensor Linking
+    3311: 3  # Sharpshooter
+    21059: 3  # Shield Compensation
+    3419: 3  # Shield Management
+    3416: 3  # Shield Operation
+    3425: 3  # Shield Upgrades
+    3431: 3  # Signature Analysis
+    3303: 3  # Small Energy Turret
+    3301: 3  # Small Hybrid Turret
+    3302: 3  # Small Projectile Turret
+    3315: 3  # Surgical Strike
+    3420: 3  # Tactical Shield Manipulation
+    3429: 3  # Target Management
+    22809: 3  # Thermal Armor Compensation
+    28164: 3  # Thermodynamics
+    3317: 3  # Trajectory Analysis
+    3455: 3  # Warp Drive Operation
+    3318: 3  # Weapon Upgrades
+
+alliances:
+  - id: 99800001
+    name: Dev Incursion Alliance
+    ticker: DEVIA
+    executor_corporation_id: 98800001
+  - id: 99800002
+    name: Dev Hostile Holdings
+    ticker: HOSTL
+    executor_corporation_id: 98800004
+
+corporations:
+  - id: 98800001
+    name: Dev Incursion Corp
+    ticker: DINC
+    alliance_id: 99800001
+    ceo_id: 2120000001
+  - id: 98800002
+    name: Dev Logistics Corp
+    ticker: DLOG
+    alliance_id: 99800001
+    ceo_id: 2120000004
+  # The SRP wallet: pilots pay coverage into it, the service account (Dev SRP Ledger) reads it.
+  - id: 98800003
+    name: Dev SRP Holding
+    ticker: DSRP
+    ceo_id: 2120000009
+    wallets:
+      - { division: 1, balance: 1250000000 }
+    journal:
+      - division: 1
+        date: -6h
+        ref_type: player_donation
+        amount: 20000000
+        description: Dev Vindi Tarek deposited cash into Dev SRP Holding's account
+        first_party_id: 2120000005
+        second_party_id: 98800003
+        reason: srp
+      - division: 1
+        date: -1d
+        ref_type: player_donation
+        amount: 125000000
+        description: Dev Logi Mira deposited cash into Dev SRP Holding's account
+        first_party_id: 2120000004
+        second_party_id: 98800003
+        reason: srp per focus
+  - id: 98800004
+    name: Dev Banned Pirates
+    ticker: BANP
+    alliance_id: 99800002
+    ceo_id: 2120000008
+    waitlist_ban: Banned from the dev waitlist (dev-esi seed).
+  # Defender in an active war: its pilots get the AT-WAR tag and can't x-up logi.
+  - id: 98800005
+    name: Dev War Target Corp
+    ticker: WART
+    ceo_id: 2120000010
+
+characters:
+  - id: 2120000001
+    name: Dev FC Aurora
+    corporation_id: 98800001
+    notes: Fleet commander and waitlist admin; boss of the seeded fleet.
+    waitlist_role: admin
+    skill_set: elite
+    implants: [20499, 20501, 20503, 20505, 20507, 3119]
+    ship_type_id: 22474 # Damnation
+    solar_system_id: 30000052 # Maspah (incursion staging)
+  - id: 2120000002
+    name: Dev FC Aurora Alt
+    corporation_id: 98800001
+    notes: Aurora's logi alt (log in with "add alt").
+    skill_set: elite
+    implants: [3470, 3482]
+    ship_type_id: 33472 # Nestor
+    solar_system_id: 30000052
+  - id: 2120000003
+    name: Dev FC Aurora Scout
+    corporation_id: 98800001
+    notes: Aurora's second alt; basic skills, no implants.
+    skill_set: basic
+    ship_type_id: 670
+  - id: 2120000011
+    name: Dev FC Brann
+    corporation_id: 98800002
+    notes: Second fleet commander (fc role), not in a fleet.
+    waitlist_role: fc
+    skill_set: elite
+    ship_type_id: 17740 # Vindicator
+    solar_system_id: 30000052
+  - id: 2120000004
+    name: Dev Logi Mira
+    corporation_id: 98800002
+    notes: Logi pilot; passes the Nestor fits.
+    skill_set: elite
+    implants: [3470, 3482, 3239]
+    ship_type_id: 33472 # Nestor
+    solar_system_id: 30000052
+  - id: 2120000005
+    name: Dev Vindi Tarek
+    corporation_id: 98800001
+    notes: DPS with the full HYBRID implant set; passes the Vindicator fits.
+    skill_set: elite
+    implants: [20499, 20501, 20503, 20505, 20507, 3214, 3224]
+    ship_type_id: 17740 # Vindicator
+    solar_system_id: 30000052
+  - id: 2120000006
+    name: Dev Marauder Trainee
+    corporation_id: 98800002
+    notes: Everything at V but Marauders untrained; Vindicator passes, Kronos/Paladin/Vargur fail.
+    skill_set: elite
+    skills:
+      28667: 0 # Marauders
+    ship_type_id: 17740
+  - id: 2120000007
+    name: Dev Newbro Pell
+    corporation_id: 98800001
+    notes: Basic skills, no implants; fails every doctrine fit.
+    skill_set: basic
+    ship_type_id: 670
+  - id: 2120000008
+    name: Dev Banned Rook
+    corporation_id: 98800004
+    notes: Member of a corporation banned on the waitlist; login is refused.
+    skill_set: elite
+    ship_type_id: 17740
+  - id: 2120000009
+    name: Dev SRP Ledger
+    corporation_id: 98800003
+    notes: SRP service account; reads the Dev SRP Holding wallet.
+    skill_set: basic
+  - id: 2120000010
+    name: Dev Wartarget Vex
+    corporation_id: 98800005
+    notes: Corporation at war; logi is blocked and fits get AT-WAR.
+    skill_set: elite
+    ship_type_id: 33472
+    solar_system_id: 30000052
+
+fleets:
+  - boss_id: 2120000001
+    motd: "<font size=\"12\">Dev fleet. Staging: Maspah.</font>"
+
+wars:
+  - id: 750001
+    aggressor: { alliance_id: 99800002, isk_destroyed: 1500000000, ships_killed: 3 }
+    defender: { corporation_id: 98800005, isk_destroyed: 0, ships_killed: 0 }
+    declared: -3d
+    started: -2d
+
+killmails:
+  - killmail_id: 130000001
+    killmail_hash: 0d1e2f3a4b5c6d7e8f90a1b2c3d4e5f60718293a
+    killmail_time: -5h
+    solar_system_id: 30000052
+    victim:
+      character_id: 2120000005
+      corporation_id: 98800001
+      alliance_id: 99800001
+      damage_taken: 412873
+      ship_type_id: 17740 # Vindicator
+      position: { x: 1.0e12, y: -2.5e11, z: 7.0e11 }
+      items:
+        - { item_type_id: 3186, flag: 27, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 3186, flag: 28, quantity_dropped: 1, singleton: 0 }
+        - { item_type_id: 3186, flag: 29, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 3186, flag: 30, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 19335, flag: 19, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 17559, flag: 20, quantity_dropped: 1, singleton: 0 }
+        - { item_type_id: 2048, flag: 11, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 15895, flag: 12, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 26402, flag: 92, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 22993, flag: 5, quantity_dropped: 4000, singleton: 0 }
+    attackers:
+      - { faction_id: 500019, damage_done: 412873, final_blow: true, security_status: 0 }
+  - killmail_id: 130000002
+    killmail_hash: 9a8b7c6d5e4f30211203f4e5d6c7b8a9f0e1d2c3
+    killmail_time: -1d
+    solar_system_id: 30000054
+    victim:
+      character_id: 2120000004
+      corporation_id: 98800002
+      alliance_id: 99800001
+      damage_taken: 298112
+      ship_type_id: 33472 # Nestor
+      items:
+        - { item_type_id: 23416, flag: 27, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 23416, flag: 28, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 41191, flag: 19, quantity_dropped: 1, singleton: 0 }
+        - { item_type_id: 18883, flag: 11, quantity_destroyed: 1, singleton: 0 }
+        - { item_type_id: 26298, flag: 92, quantity_destroyed: 1, singleton: 0 }
+    attackers:
+      - { faction_id: 500019, damage_done: 298112, final_blow: true, security_status: 0 }
+
+# Constellations and systems are real, so the incursion tracker can place them on the star map.
+incursions:
+  - constellation_id: 20000008 # Mossas (high-sec)
+    staging_solar_system_id: 30000052 # Maspah
+    infested_solar_systems: [30000051, 30000052, 30000053, 30000054, 30000055, 30000056]
+    state: established
+    influence: 0.35
+    has_boss: false
+  - constellation_id: 20000013 # Aguh (low-sec)
+    staging_solar_system_id: 30000090 # Ilahed
+    infested_solar_systems: [30000089, 30000090, 30000091, 30000092, 30000093, 30000094]
+    state: mobilizing
+    influence: 0.8
+    has_boss: true
+  - constellation_id: 20000032 # OSJ7-I (null-sec)
+    staging_solar_system_id: 30000223 # H-UCD1
+    infested_solar_systems: [30000222, 30000223, 30000224, 30000225, 30000226, 30000227]
+    state: withdrawing
+    influence: 1.0
+    has_boss: false
+
+names:
+  - { id: 500019, name: "Sansha's Nation", category: faction }

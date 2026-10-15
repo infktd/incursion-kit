@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>dev-esi</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; color: #1d2330; background: #f5f6f8; }
+  header { background: #1d2330; color: #fff; padding: .6em 1em; display: flex; gap: 1em; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 1.1em; margin: 0; }
+  header small { color: #aab; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(28em, 1fr)); gap: 1em; padding: 1em; }
+  section { background: #fff; border: 1px solid #dde; border-radius: 6px; padding: .6em .9em; overflow-x: auto; }
+  h2 { font-size: 1em; margin: .2em 0 .6em; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { text-align: left; padding: .2em .4em; border-bottom: 1px solid #eef; vertical-align: top; }
+  th { font-weight: 600; color: #556; }
+  button { font: inherit; padding: .1em .5em; cursor: pointer; }
+  .muted { color: #889; }
+  .squad { margin: .2em 0 .2em 1em; }
+  .event { font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap; }
+  #error { color: #b00; }
+  select, input { font: inherit; }
+</style>
+<header>
+  <h1>dev-esi</h1>
+  <small>a fake EVE SSO and ESI for development</small>
+  <label>Invite accept delay (ms) <input id="delay" type="number" min="0" style="width:6em"></label>
+  <button onclick="saveDelay()">Save</button>
+  <button onclick="if (confirm('Reset the world to the seed?')) call('POST', 'reset')">Reset to seed</button>
+  <span id="error"></span>
+</header>
+<main>
+  <section>
+    <h2>Fleets</h2>
+    <p>
+      <select id="boss"></select>
+      <button onclick="call('POST', 'fleets', {boss_id: +val('boss')})">Form fleet</button>
+    </p>
+    <div id="fleets"></div>
+  </section>
+  <section>
+    <h2>Characters</h2>
+    <table id="characters"></table>
+  </section>
+  <section>
+    <h2>Events</h2>
+    <div id="events"></div>
+  </section>
+</main>
+<script>
+// Works at /_dev and behind a path prefix (e.g. /dev-esi/_dev).
+const base = location.pathname.replace(/\/_dev\/?$/, '') + '/_dev/';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const val = id => document.getElementById(id).value;
+let state = null, delayEdited = false;
+
+async function call(method, path, body) {
+  const res = await fetch(base + path, {
+    method, headers: body ? {'content-type': 'application/json'} : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  document.getElementById('error').textContent = res.ok ? '' : `${method} ${path}: ${text}`;
+  await refresh();
+  return text;
+}
+
+function saveDelay() {
+  delayEdited = false;
+  call('PUT', 'settings', {invite_accept_delay_ms: +val('delay')});
+}
+document.getElementById('delay').addEventListener('input', () => delayEdited = true);
+
+function render() {
+  // Re-rendering must not lose what the user picked in the selects.
+  const kept = [...document.querySelectorAll('select[id]')].map(s => [s.id, s.value]);
+  const chars = Object.fromEntries(state.characters.map(c => [c.id, c]));
+  const corps = Object.fromEntries(state.corporations.map(c => [c.id, c]));
+  const name = id => esc(chars[id]?.name ?? id);
+  if (!delayEdited) document.getElementById('delay').value = state.settings.invite_accept_delay_ms;
+
+  document.getElementById('boss').innerHTML =
+    state.characters.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+
+  document.getElementById('fleets').innerHTML = state.fleets.map(f => {
+    const members = f.members;
+    const line = m => `<div>${name(m.character_id)} ${m.character_id === f.boss_id ? '<b>(boss)</b>' : ''}
+      <span class="muted">${esc(m.role)}</span>
+      ${m.character_id === f.boss_id ? '' : `<button onclick="call('PUT', 'fleets/${f.fleet_id}/boss', {character_id: ${m.character_id}})">make boss</button>`}
+      <button onclick="call('DELETE', 'fleets/${f.fleet_id}/members/${m.character_id}')">remove</button></div>`;
+    const outside = state.characters.filter(c => !c.fleet);
+    const squads = f.wings.flatMap(w => w.squads.map(s => ({wing: w, squad: s})));
+    return `<div style="margin-bottom:1em">
+      <b>Fleet ${f.fleet_id}</b> <button onclick="call('DELETE', 'fleets/${f.fleet_id}')">disband</button>
+      <div class="muted">MOTD: ${esc(f.motd) || '(none)'}</div>
+      ${members.filter(m => m.role === 'fleet_commander').map(line).join('')}
+      ${f.wings.map(w => `<div><i>${esc(w.name)}</i> <span class="muted">${w.id}</span>
+        ${members.filter(m => m.wing_id === w.id && m.squad_id === -1).map(line).join('')}
+        ${w.squads.map(s => `<div class="squad">${esc(s.name)} <span class="muted">${s.id}</span>
+          ${members.filter(m => m.squad_id === s.id).map(line).join('')}</div>`).join('')}</div>`).join('')}
+      <div>Add <select id="add-${f.fleet_id}">${outside.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+        to <select id="squad-${f.fleet_id}">${squads.map(x => `<option value="${x.squad.id}">${esc(x.wing.name)} / ${esc(x.squad.name)}</option>`).join('')}</select>
+        <button onclick="call('POST', 'fleets/${f.fleet_id}/members', {character_id: +val('add-${f.fleet_id}'), squad_id: +val('squad-${f.fleet_id}')})">add</button></div>
+    </div>`;
+  }).join('') || '<p class="muted">No fleets.</p>';
+
+  document.getElementById('characters').innerHTML =
+    '<tr><th>Character</th><th>Corp</th><th>Fleet</th><th></th></tr>' +
+    state.characters.map(c => `<tr>
+      <td>${esc(c.name)}<br><span class="muted">${c.id}${c.waitlist_role ? ' &middot; ' + esc(c.waitlist_role) : ''}</span></td>
+      <td>${esc(corps[c.corporation_id]?.ticker)}</td>
+      <td>${c.fleet ? `${c.fleet.fleet_id}<br><span class="muted">${esc(c.fleet.role_name)}</span>` : ''}
+          ${c.pending_invite ? `<br>invited to ${c.pending_invite.fleet_id}
+            <button onclick="call('POST', 'invites/${c.id}/accept')">accept</button>
+            <button onclick="call('POST', 'invites/${c.id}/decline')">decline</button>` : ''}</td>
+      <td>${c.fleet ? `<button onclick="call('POST', 'characters/${c.id}/leave')">leave</button>` : ''}
+          <label title="accept invites automatically"><input type="checkbox" ${c.auto_accept_invites ? 'checked' : ''}
+            onchange="call('PATCH', 'characters/${c.id}', {auto_accept_invites: this.checked})"> auto</label></td>
+    </tr>`).join('');
+
+  for (const [id, value] of kept) {
+    const select = document.getElementById(id);
+    if (select && [...select.options].some(o => o.value === value)) select.value = value;
+  }
+}
+
+async function refresh() {
+  try {
+    state = await (await fetch(base + 'state')).json();
+    render();
+    const events = await (await fetch(base + 'events')).json();
+    document.getElementById('events').innerHTML = events.slice(-40).reverse()
+      .map(e => `<div class="event">${esc(e.at.slice(11, 19))} ${esc(e.kind)}: ${esc(e.detail)}</div>`).join('');
+  } catch (e) {
+    document.getElementById('error').textContent = String(e);
+  }
+}
+refresh();
+setInterval(refresh, 2000);
+</script>
+</html>

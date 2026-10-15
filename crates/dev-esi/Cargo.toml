@@ -1,0 +1,50 @@
+[package]
+name = "dev-esi"
+description = "A local stand-in for EVE SSO and ESI, for development and tests. Never for production."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "dev_esi"
+
+[[bin]]
+name = "dev-esi"
+path = "src/main.rs"
+
+[dependencies]
+axum.workspace = true
+tokio = { workspace = true, features = ["net"] }
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr.workspace = true
+toml.workspace = true
+chrono.workspace = true
+base64.workspace = true
+rand.workspace = true
+aws-lc-rs.workspace = true
+sqlx.workspace = true
+url.workspace = true
+clap.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+reqwest.workspace = true
+tempfile.workspace = true
+wl-api.workspace = true
+wl-core.workspace = true
+wl-db = { workspace = true, features = ["test-support"] }
+wl-esi.workspace = true
+wl-eve-data.workspace = true
+wl-fitting.workspace = true
+wl-live.workspace = true
+wl-workers.workspace = true

@@ -194,6 +194,10 @@ url = "https://waitlist.example.org/auth/cb"
 | `esi_url` | CCP's ESI | ESI base URL override (testing). |
 | `sso_authorize_url`, `sso_token_url` | CCP's SSO | SSO URL overrides (testing). |
 
+The overrides are for development and tests, e.g. with dev-esi (a local stand-in for SSO and ESI,
+see [CONTRIBUTING.md](../CONTRIBUTING.md#develop-a-frontend-without-a-ccp-account)); the server
+logs a warning when any is set. Leave them unset in production.
+
 ### `[data]`
 
 | Key | Default | |

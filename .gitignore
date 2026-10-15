@@ -8,4 +8,5 @@ deploy/data/
 deploy/sde/
 deploy/backups/
 deploy/frontend/
+deploy/dev-esi-state/
 config.toml
